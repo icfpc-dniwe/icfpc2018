@@ -1,5 +1,7 @@
 module ICFPC2018.Simulation where
 
+import Data.Vector (Vector)
+import qualified Data.Vector as V
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types
@@ -18,7 +20,12 @@ normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
     | otherwise = (-1)
 
 packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
-packMove = error "TODO"
+-- stupid pack using only SMove and not checking collisions
+packMove (V3 xFrom yFrom zFrom) (V3 xTo yTo zTo)
+  | xFrom /= xTo = SMove (mkLinearDifference X (xTo - xFrom)) : packMove (V3 xTo yFrom zFrom) (V3 xTo yTo zTo)
+  | yFrom /= yTo = SMove (mkLinearDifference Y (yTo - yFrom)) : packMove (V3 xFrom yTo zFrom) (V3 xTo yTo zTo)
+  | zFrom /= zTo = SMove (mkLinearDifference Z (zTo - zFrom)) : packMove (V3 xFrom yFrom zTo) (V3 xTo yTo zTo)
+  | otherwise    = []
 
 simulateStep
   :: VolatileCoordinate
@@ -34,3 +41,16 @@ simulateStep c = \case
 
   LMove d1 d2 -> error "TODO: simulateStep LMove"
   cmd         -> error $ "TODO: simulateStep " ++ (show cmd)
+
+data SingleBotModel = SingleBotModel
+                      { botPos :: !(V3 Int)
+                      , filledModel :: !Model
+                      } deriving (Show, Eq)
+
+packIntensions :: Intensions -> SingleBotModel -> Trace
+packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
+  where
+    upIdx = case idx of
+      (V3 x y z) -> (V3 x (y + 1) z)
+packIntensions (FlipGravity:xs) model = V.singleton Flip : packIntensions xs model
+packintensions [] _ = []

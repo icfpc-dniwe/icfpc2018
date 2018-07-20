@@ -35,7 +35,7 @@ type Score = Int
 data Intension
   = FlipGravity
   | FillIdx I3
-type Intensions = [(Intension)]
+type Intensions = [Intension]
 
 data Axis = X | Y | Z deriving (Show, Eq, Enum, Bounded)
 
