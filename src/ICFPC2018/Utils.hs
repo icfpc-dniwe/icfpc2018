@@ -19,7 +19,7 @@ mkLinearDifference Z v = V3 0 0 v
 
 
 packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command] 
-packMove = error "TODO'
+packMove = error "TODO"
 
 simulateStep :: VolatileCoordinate -> Command -> [VolatileCoordinate]
 simulateStep = error "TODO"
