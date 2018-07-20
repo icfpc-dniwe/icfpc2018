@@ -1,5 +1,5 @@
-{ mkDerivation, base, binary, bytestring, linear, QuickCheck
-, stdenv, tasty, tasty-quickcheck, vector
+{ mkDerivation, base, binary, bytestring, ChasingBottoms, linear
+, QuickCheck, stdenv, tasty, tasty-quickcheck, vector
 }:
 mkDerivation {
   pname = "icfpc2018";
@@ -10,7 +10,7 @@ mkDerivation {
   libraryHaskellDepends = [ base binary bytestring linear vector ];
   executableHaskellDepends = [ base ];
   testHaskellDepends = [
-    base linear QuickCheck tasty tasty-quickcheck vector
+    base ChasingBottoms linear QuickCheck tasty tasty-quickcheck vector
   ];
   license = stdenv.lib.licenses.bsd3;
 }

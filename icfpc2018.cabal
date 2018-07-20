@@ -38,9 +38,11 @@ test-suite tests
                      , tasty
                      , tasty-quickcheck
                      , QuickCheck
+                     , ChasingBottoms
                      , linear
                      , vector
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   default-language:    Haskell2010
+  default-extensions:  ScopedTypeVariables
   ghc-options:         -Wall
