@@ -1,12 +1,15 @@
 module ICFPC2018.IO
   ( getModel
+  , putTrace
   ) where
 
+import Control.Monad
 import Data.Word
 import Data.Bits
 import Linear.V3 (V3(..))
 import qualified Data.Vector as V
 import Data.Binary.Get
+import Data.Binary.Put
 
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
@@ -27,3 +30,11 @@ getModel = do
   bitsData <- getBits size
   let vec = V.fromList bitsData
   return $ T3.create vec (V3 resolution resolution resolution)
+
+putCommand :: Command -> Put
+putCommand Halt = putWord8 0b11111111
+putCommand Wait = putWord8 0b11111110
+putCommand Flip = putWord8 0b11111101
+
+putTrace :: Trace -> Put
+putTrace trace = forM_ trace $ \cmds -> forM_ cmds $ \_ -> undefined
