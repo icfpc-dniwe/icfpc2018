@@ -70,8 +70,11 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
     scoreCommand model (FusionS (V3 1 1 1)) == 0,
     scoreCommand model (Fill (V3 2 1 1)) == 6,
     scoreCommand model (Fill (V3 0 0 0)) == 12,
-    scoreTrace model [
-      V.fromList [Wait,                        Flip, SMove (V3 0 2 1), Fill (V3 2 1 1), Halt],
-      V.fromList [LMove (V3 0 2 1) (V3 1 0 0), Wait, Flip,             Fill (V3 0 0 0), Halt]
-      ] == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]]
+    scoreTrace model 3 (V.fromList <$> [
+      [Wait, LMove (V3 0 2 1) (V3 1 0 0)],
+      [Flip, Wait],
+      [SMove (V3 0 2 1), Flip],
+      [Fill (V3 2 1 1), Fill (V3 0 0 0)],
+      [Halt, Halt]
+      ]) == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 30 + 3 + 3 + 3) * 27
     ]
