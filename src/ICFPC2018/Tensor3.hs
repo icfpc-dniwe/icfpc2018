@@ -25,7 +25,7 @@ resultIdx (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
     yIdx < ySize && yIdx >= 0 &&
     zIdx < zSize && zIdx >= 0
       = xIdx + yIdx * xSize + zIdx * xSize * ySize
-  | otherwise = error "Invalid index"
+  | otherwise = error "resultIdx: invalid index"
 
 size :: Tensor3 a -> Tensor3Size
 size (Tensor3 _ sz) = sz
@@ -44,4 +44,4 @@ update (Tensor3 v sz) updates = Tensor3 (V.unsafeUpd v $ map (\(idx, val) -> (re
 create :: Vector a -> Tensor3Size -> Tensor3 a
 create v sz
   | V.length v == product sz = Tensor3 v sz
-  | otherwise = error "invalid tensor size"
+  | otherwise = error "create: invalid tensor size"
