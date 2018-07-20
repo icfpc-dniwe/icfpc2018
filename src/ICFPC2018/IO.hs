@@ -26,4 +26,4 @@ getModel = do
   let size = resolution * resolution * resolution
   bitsData <- getBits size
   let vec = V.fromList bitsData
-  return $ T3.generate vec (V3 resolution resolution resolution)
+  return $ T3.create vec (V3 resolution resolution resolution)
