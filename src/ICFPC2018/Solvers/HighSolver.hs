@@ -4,11 +4,5 @@ module ICFPC2018.Solvers.HighSolver
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
 
-solver :: Model -> Trace
-solver model = undefined
-
-addFlip :: Command
-addFlip = Flip
-
-moveToZero :: T3.Tensor3Idx -> Trace
-moveToZero = undefined
+solver :: Model -> Intensions
+solver model = FlipGravity : map (\v -> FillIdx v) (T3.snakeIdx model) ++ [FlipGravity]

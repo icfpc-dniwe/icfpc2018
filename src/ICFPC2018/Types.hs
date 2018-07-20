@@ -2,7 +2,7 @@ module ICFPC2018.Types where
 
 import Data.Vector (Vector)
 import Data.IntSet (IntSet)
-import ICFPC2018.Tensor3 (Tensor3)
+import ICFPC2018.Tensor3 (Tensor3, Tensor3Idx)
 import Linear.V3 (V3(..))
 
 type Model = Tensor3 Bool
@@ -28,5 +28,10 @@ data Command
   deriving (Show, Eq)
 type Step = Vector Command
 type Trace = [Step]
+
+data Intension
+  = FlipGravity
+  | FillIdx Tensor3Idx
+type Intensions = [(Intension)]
 
 data Axis = X | Y | Z deriving (Show, Eq)
