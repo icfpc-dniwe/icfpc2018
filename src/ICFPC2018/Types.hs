@@ -11,4 +11,4 @@ type BotIdx = Int
 type Distance = V3 Int
 data Command = Halt | Wait | Flip | SMove Distance | LMove Distance | Fission Distance Int | Fill Int
                               deriving (Show, Eq)
-data Trace = [(BotIdx, Command)]
+type Trace = [(BotIdx, Command)]
