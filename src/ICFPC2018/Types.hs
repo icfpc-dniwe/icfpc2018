@@ -9,14 +9,24 @@ type Model = Tensor3 Bool
 
 type BotIdx = Int
 type BotSet = IntSet
+type VolatileCoordinate = V3 Int
 type ShortDifference = V3 Int
 type LongDifference = V3 Int
 type NearDifference = V3 Int
-data Command =
+data Command
   -- Single commands
-    Halt | Wait | Flip | SMove !LongDifference | LMove !ShortDifference !ShortDifference | Fission !NearDifference !Int | Fill !NearDifference
+  = Halt
+  | Wait
+  | Flip
+  | SMove !LongDifference
+  | LMove !ShortDifference !ShortDifference
+  | Fission !NearDifference !Int
+  | Fill !NearDifference
   -- Group commands
-  | FusionP !NearDifference | FusionS !NearDifference
+  | FusionP !NearDifference
+  | FusionS !NearDifference
   deriving (Show, Eq)
 type Step = Vector Command
 type Trace = [Step]
+
+data Axis = X | Y | Z deriving (Show, Eq)
