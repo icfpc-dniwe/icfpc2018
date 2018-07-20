@@ -1,8 +1,5 @@
 module ICFPC2018.Utils where
 
-import ICFPC2018.Types
-import ICFPC2018.Tensor3 (Tensor3Size, Tensor3Idx)
-import qualified ICFPC2018.Tensor3 as T3
 import Linear.V3 (V3(..))
 
 div1 :: Integral a => a -> a -> a
@@ -13,11 +10,17 @@ a `div1` b
 
 infixl 7  `div1`
 
+checkBounds :: V3 Int -> V3 Int -> Bool
+checkBounds (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
+  = xIdx < xSize && xIdx >= 0 &&
+    yIdx < ySize && yIdx >= 0 &&
+    zIdx < zSize && zIdx >= 0
+
 {-
 moving across Tensor3 starting from (0, 0, 0) along X first then Z and finally Y.
 Y == 0 is bottom plane.
 -}
-snakeIdx :: Tensor3Size -> [Tensor3Idx]
+snakeIdx :: V3 Int -> [V3 Int]
 snakeIdx (V3 xSize ySize zSize) = helpFold (V3 0 0 0) False
   where
     helpFold (V3 xIdx yIdx zIdx) ySwitch
@@ -27,31 +30,23 @@ snakeIdx (V3 xSize ySize zSize) = helpFold (V3 0 0 0) False
       | otherwise = undefined
       where
         firstX = xIdx == 0
-        firstY = yIdx == 0
+        -- firstY = yIdx == 0
         firstZ = zIdx == 0
         lastX = xIdx == xSize - 1
-        lastY = yIdx == ySize - 1
+        -- lastY = yIdx == ySize - 1
         lastZ = zIdx == zSize - 1
         xToV3 x = (V3 x yIdx zIdx)
         changeZ x | lastZ && not ySwitch = changeY x
                   | firstZ && ySwitch    = changeY x
                   | not ySwitch = helpFold (V3 x yIdx (zIdx + 1)) ySwitch
                   | ySwitch = helpFold (V3 x yIdx (zIdx - 1)) ySwitch
+                  | otherwise = error "snakeIdx: impossible"
         changeY x = helpFold (V3 x (yIdx + 1) zIdx) (not ySwitch)
 
-mkLinearDifference :: Axis -> Int -> V3 Int
-mkLinearDifference X v = V3 v 0 0
-mkLinearDifference Y v = V3 0 v 0
-mkLinearDifference Z v = V3 0 0 v
-
+-- Manhattan distance
 mlen :: Integral a => V3 a -> a
-mlen (V3 x y z) = sum $ abs <$> [x, y, z]
+mlen v = sum $ abs <$> v
 
+-- Chebyshev distance
 clen :: Integral a => V3 a -> a
-clen (V3 x y z) = foldr1 (\x y -> max x y) $ abs <$> [x, y, z]
-
-packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
-packMove = error "TODO"
-
-simulateStep :: VolatileCoordinate -> Command -> [VolatileCoordinate]
-simulateStep = error "TODO"
+clen v = foldr1 max $ abs <$> v

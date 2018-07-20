@@ -2,7 +2,7 @@ module ICFPC2018.Types where
 
 import Data.Vector (Vector)
 import Data.IntSet (IntSet)
-import ICFPC2018.Tensor3 (Tensor3, Tensor3Idx)
+import ICFPC2018.Tensor3 (Tensor3, I3)
 import Linear.V3 (V3(..))
 
 type Model = Tensor3 Bool
@@ -10,9 +10,11 @@ type Model = Tensor3 Bool
 type BotIdx = Int
 type BotSet = IntSet
 type VolatileCoordinate = V3 Int
-type ShortDifference = V3 Int
-type LongDifference = V3 Int
-type NearDifference = V3 Int
+type Difference = V3 Int
+type ShortDifference = Difference
+type LongDifference  = Difference
+type NearDifference  = Difference
+
 data Command
   -- Single commands
   = Halt
@@ -32,7 +34,13 @@ type Score = Int
 
 data Intension
   = FlipGravity
-  | FillIdx Tensor3Idx
-type Intensions = [(Intension)]
+  | FillIdx I3
+type Intensions = [Intension]
 
-data Axis = X | Y | Z deriving (Show, Eq)
+data Axis = X | Y | Z deriving (Show, Eq, Enum, Bounded)
+
+maxSLD :: Int
+maxSLD = 5
+
+maxLLD :: Int
+maxLLD = 15

@@ -7,15 +7,19 @@ import Test.Tasty.QuickCheck as QC
 import Test.ChasingBottoms
 
 import ICFPC2018.Types
-import ICFPC2018.Tensor3 (Tensor3, Tensor3Idx)
+import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
+import ICFPC2018.Simulation
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [tensor3Tests]
+tests = testGroup "Tests" [
+    tensor3Tests
+  , simulationTests
+  ]
 
 tensor3Tests :: TestTree
 tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate, testScoring]
@@ -26,13 +30,13 @@ instance Arbitrary a => Arbitrary (Tensor3 a) where
     values <- vectorOf (product size) arbitrary
     return $ T3.create (V.fromList values) size
 
-genT3Index :: Tensor3 a -> Gen Tensor3Idx
-genT3Index tensor = mapM (\sz -> choose (0, sz - 1)) (T3.size tensor)
+genI3 :: Tensor3 a -> Gen I3
+genI3 tensor = mapM (\sz -> choose (0, sz - 1)) (T3.size tensor)
 
 tensor3Flip :: TestTree
 tensor3Flip = QC.testProperty "Flip Tensor3 value" $ do
   tensor <- arbitrary `suchThat` ((/= 0) . product . T3.size)
-  i <- genT3Index tensor
+  i <- genI3 tensor
   let value = tensor T3.! i
       tensor' = T3.update tensor [(i, not value)]
       value' = tensor' T3.! i
@@ -78,3 +82,23 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
       [Halt, Halt]
       ]) == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 30 + 3 + 3 + 3) * 27
     ]
+
+simulationTests :: TestTree
+simulationTests = testGroup "Simulation Tests" [simulationSMove]
+
+newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
+instance Arbitrary VolatileCoordinateWrapper where
+  arbitrary = do
+    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, s)
+    return $ VolatileCoordinateWrapper (V3 x y z)
+
+newtype LongDifferenceWrapper = LongDifferenceWrapper LongDifference deriving Show
+instance Arbitrary LongDifferenceWrapper where
+  arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitraryBoundedEnum <*> (choose (1, maxLLD)))
+
+
+simulationSMove :: TestTree
+simulationSMove = QC.testProperty "SMove" $ \(
+    VolatileCoordinateWrapper c
+  , LongDifferenceWrapper d
+  ) -> last (simulateStep c (SMove d)) == c + d

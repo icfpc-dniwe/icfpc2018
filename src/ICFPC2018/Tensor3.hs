@@ -1,6 +1,6 @@
 module ICFPC2018.Tensor3
   ( Tensor3Size
-  , Tensor3Idx
+  , I3
   , Tensor3
   , index
   , (!)
@@ -14,24 +14,23 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Linear.V3 (V3(..))
 
+import ICFPC2018.Utils
+
 type Tensor3Size = V3 Int
-type Tensor3Idx = V3 Int
+type I3 = V3 Int
 
 data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
                deriving (Show, Eq)
 
-linearIdx :: Tensor3Size -> Tensor3Idx -> Int
+linearIdx :: Tensor3Size -> I3 -> Int
 linearIdx (V3 xSize ySize _) (V3 xIdx yIdx zIdx) = xIdx + yIdx * xSize + zIdx * xSize * ySize
 
-checkedLinearIdx :: Tensor3Size -> Tensor3Idx -> Int
-checkedLinearIdx sz@(V3 xSize ySize zSize) idx@(V3 xIdx yIdx zIdx)
-  | xIdx < xSize && xIdx >= 0 &&
-    yIdx < ySize && yIdx >= 0 &&
-    zIdx < zSize && zIdx >= 0
-  = linearIdx sz idx
+checkedLinearIdx :: Tensor3Size -> I3 -> Int
+checkedLinearIdx sz idx
+  | checkBounds sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
-tensorIdx :: Tensor3Size -> Int -> Tensor3Idx
+tensorIdx :: Tensor3Size -> Int -> I3
 tensorIdx (V3 xSize ySize _) idx = V3 xIdx yIdx zIdx
   where (zIdx, surfIdx) = idx `divMod` (xSize * ySize)
         (yIdx, xIdx) = surfIdx `divMod` ySize
@@ -39,14 +38,14 @@ tensorIdx (V3 xSize ySize _) idx = V3 xIdx yIdx zIdx
 size :: Tensor3 a -> Tensor3Size
 size (Tensor3 _ sz) = sz
 
-index :: Tensor3 a -> Tensor3Idx -> a
+index :: Tensor3 a -> I3 -> a
 index (Tensor3 v sz) idx = v `V.unsafeIndex` checkedLinearIdx sz idx
 
 infixl 9 !
-(!) :: Tensor3 a -> Tensor3Idx -> a
+(!) :: Tensor3 a -> I3 -> a
 (!) = index
 
-update :: Tensor3 a -> [(Tensor3Idx, a)] -> Tensor3 a
+update :: Tensor3 a -> [(I3, a)] -> Tensor3 a
 update tensor [] = tensor
 update (Tensor3 v sz) updates = Tensor3 (V.unsafeUpd v $ map (first $ checkedLinearIdx sz) updates) sz
 
