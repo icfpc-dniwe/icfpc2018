@@ -19,6 +19,7 @@ library
   -- other-extensions:
   build-depends:       base >=4.10
                      , linear
+                     , containers
                      , binary
                      , bytestring
                      , vector

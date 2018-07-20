@@ -16,7 +16,7 @@ import Linear.V3 (V3(..))
 type Tensor3Size = V3 Int
 type Tensor3Idx = V3 Int
 
-data Tensor3 a = Tensor3 (Vector a) Tensor3Size
+data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
                deriving (Show, Eq)
 
 resultIdx :: Tensor3Size -> Tensor3Idx -> Int
