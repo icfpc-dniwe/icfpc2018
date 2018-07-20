@@ -14,6 +14,8 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Linear.V3 (V3(..))
 
+import ICFPC2018.Utils
+
 type Tensor3Size = V3 Int
 type I3 = V3 Int
 
@@ -24,11 +26,8 @@ linearIdx :: Tensor3Size -> I3 -> Int
 linearIdx (V3 xSize ySize _) (V3 xIdx yIdx zIdx) = xIdx + yIdx * xSize + zIdx * xSize * ySize
 
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
-checkedLinearIdx sz@(V3 xSize ySize zSize) idx@(V3 xIdx yIdx zIdx)
-  | xIdx < xSize && xIdx >= 0 &&
-    yIdx < ySize && yIdx >= 0 &&
-    zIdx < zSize && zIdx >= 0
-  = linearIdx sz idx
+checkedLinearIdx sz idx
+  | checkBounds sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
 tensorIdx :: Tensor3Size -> Int -> I3

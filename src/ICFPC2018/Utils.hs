@@ -1,6 +1,5 @@
 module ICFPC2018.Utils where
 
-import ICFPC2018.Types
 import Linear.V3 (V3(..))
 
 div1 :: Integral a => a -> a -> a
@@ -10,6 +9,12 @@ a `div1` b
   where (d, m) = a `divMod` b
 
 infixl 7  `div1`
+
+checkBounds :: V3 Int -> V3 Int -> Bool
+checkBounds (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
+  = xIdx < xSize && xIdx >= 0 &&
+    yIdx < ySize && yIdx >= 0 &&
+    zIdx < zSize && zIdx >= 0
 
 {-
 moving across Tensor3 starting from (0, 0, 0) along X first then Z and finally Y.
@@ -38,21 +43,10 @@ snakeIdx (V3 xSize ySize zSize) = helpFold (V3 0 0 0) False
                   | otherwise = error "snakeIdx: impossible"
         changeY x = helpFold (V3 x (yIdx + 1) zIdx) (not ySwitch)
 
+-- Manhattan distance
 mlen :: Integral a => V3 a -> a
 mlen v = sum $ abs <$> v
 
+-- Chebyshev distance
 clen :: Integral a => V3 a -> a
 clen v = foldr1 max $ abs <$> v
-
-
-mkLinearDifference :: Axis -> Int -> Difference
-mkLinearDifference X v = V3 v 0 0
-mkLinearDifference Y v = V3 0 v 0
-mkLinearDifference Z v = V3 0 0 v
-
-normalizeLinearDifference :: Difference -> Difference
-normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
-  norm v
-    | v == 0    = 0
-    | v >  0    = 1
-    | otherwise = (-1)

@@ -9,7 +9,6 @@ import Test.ChasingBottoms
 import ICFPC2018.Types
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
-import ICFPC2018.Utils
 import ICFPC2018.Simulation
 import qualified ICFPC2018.Tensor3 as T3
 
