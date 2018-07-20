@@ -9,13 +9,17 @@ import Test.ChasingBottoms
 import ICFPC2018.Types
 import ICFPC2018.Tensor3 (Tensor3, Tensor3Idx)
 import ICFPC2018.Scoring
+import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [tensor3Tests]
+tests = testGroup "Tests" [
+  --   tensor3Tests
+    simulationTests
+  ]
 
 tensor3Tests :: TestTree
 tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate, testScoring]
@@ -75,3 +79,24 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
       V.fromList [LMove (V3 0 2 1) (V3 1 0 0), Wait, Flip,             Fill (V3 0 0 0), Halt]
       ] == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]]
     ]
+
+
+simulationTests :: TestTree
+simulationTests = testGroup "Simulation Tests" [simulationSMove]
+
+newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
+instance Arbitrary VolatileCoordinateWrapper where
+  arbitrary = do
+    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, s)
+    return $ VolatileCoordinateWrapper (V3 x y z)
+
+newtype LongDifferenceWrapper = LongDifferenceWrapper LongDifference deriving Show
+instance Arbitrary LongDifferenceWrapper where
+  arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitraryBoundedEnum <*> (choose (1, maxLLD)))
+
+
+simulationSMove :: TestTree
+simulationSMove = QC.testProperty "SMove" $ \(
+    VolatileCoordinateWrapper c
+  , LongDifferenceWrapper d
+  ) -> last (simulateStep c (SMove d)) == c + d
