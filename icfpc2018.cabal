@@ -20,6 +20,7 @@ library
                      , ICFPC2018.Utils
                      , ICFPC2018.Tensor3
                      , ICFPC2018.IO
+                     , ICFPC2018.Solvers.HighSolver
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.10
