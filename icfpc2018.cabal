@@ -13,6 +13,7 @@ library
   exposed-modules:     ICFPC2018.Types
                      , ICFPC2018.Utils
                      , ICFPC2018.Tensor3
+                     , ICFPC2018.Scoring
                      , ICFPC2018.IO
                      , ICFPC2018.Solvers.HighSolver
   -- other-modules:

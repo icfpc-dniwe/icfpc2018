@@ -26,8 +26,9 @@ data Command
   | FusionP !NearDifference
   | FusionS !NearDifference
   deriving (Show, Eq)
-type Step = Vector Command
+type Step = Vector Command -- indexed by bot number
 type Trace = [Step]
+type Score = Int
 
 data Intension
   = FlipGravity
