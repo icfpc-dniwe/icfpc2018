@@ -9,6 +9,9 @@ type Model = Tensor3 Bool
 
 type BotIdx = Int
 type Distance = V3 Int
-data Command = Halt | Wait | Flip | SMove Distance | LMove Distance | Fission Distance Int | Fill Int
-                              deriving (Show, Eq)
+data SingleCommand = Halt | Wait | Flip | SMove Distance | LMove Distance | Fission Distance Int | Fill Int
+                                   deriving (Show, Eq)
+data GroupCommand = FusionP Distance | FusionS Distance
+                                   deriving (Show, Eq)
+data Command = SingleCommand | GroupCommand
 type Trace = [(BotIdx, Command)]
