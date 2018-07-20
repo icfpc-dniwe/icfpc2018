@@ -40,3 +40,13 @@ executable solver
   hs-source-dirs:      exe
   default-language:    Haskell2010
   ghc-options:         -Wall
+
+test-suite tests
+  main-is:             Solver.hs
+  build-depends:       base >=4.10
+                     , icfpc2018
+                     , tasty
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      tests
+  default-language:    Haskell2010
+  ghc-options:         -Wall
