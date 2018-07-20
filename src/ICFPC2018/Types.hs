@@ -9,7 +9,7 @@ type Model = Tensor3 Bool
 
 type BotIdx = Int
 type Distance = V3 Int
-data SingleCommand = Halt | Wait | Flip | SMove Distance | LMove Distance | Fission Distance Int | Fill Int
+data SingleCommand = Halt | Wait | Flip | SMove Distance | LMove Distance Distance | Fission Distance Int | Fill Int
                                    deriving (Show, Eq)
 data GroupCommand = FusionP Distance | FusionS Distance
                                    deriving (Show, Eq)
