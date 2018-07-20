@@ -45,10 +45,10 @@ mkLinearDifference Y v = V3 0 v 0
 mkLinearDifference Z v = V3 0 0 v
 
 mlen :: Integral a => V3 a -> a
-mlen (V3 x y z) = sum $ abs <$> [x, y, z]
+mlen v = sum $ abs <$> v
 
 clen :: Integral a => V3 a -> a
-clen (V3 x y z) = foldr1 (\x y -> max x y) $ abs <$> [x, y, z]
+clen v = foldr1 max $ abs <$> v
 
 packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
 packMove = error "TODO"
