@@ -1,10 +1,7 @@
-{-# LANGUAGE LambdaCase #-}
-
 module ICFPC2018.Utils where
 
 import ICFPC2018.Types
 import Linear.V3 (V3(..))
-import Linear.Vector ((*^))
 
 div1 :: Integral a => a -> a -> a
 a `div1` b
@@ -59,23 +56,3 @@ normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
     | v == 0    = 0
     | v >  0    = 1
     | otherwise = (-1)
-
-
-packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
-packMove = error "TODO"
-
-
-simulateStep
-  :: VolatileCoordinate
-  -- ^ We suppose that this coordinate is already in list of bot's trace
-  -- ^ Probably there should be a system state
-  -> Command
-  -> [VolatileCoordinate]
-simulateStep c = \case
-  SMove d -> let
-    nd = normalizeLinearDifference d
-    ld = mlen d
-    in map (\i -> c + i*^nd) [1..ld]
-
-  LMove d1 d2 -> error "TODO: simulateStep LMove"
-  cmd         -> error $ "TODO: simulateStep " ++ (show cmd)
