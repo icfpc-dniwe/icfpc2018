@@ -7,7 +7,6 @@ import Data.Bits
 import Linear.V3 (V3(..))
 import qualified Data.Vector as V
 import Data.Binary.Get
-import Data.Binary.Put
 
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
