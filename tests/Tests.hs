@@ -17,8 +17,8 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Tests" [
-  --   tensor3Tests
-    simulationTests
+    tensor3Tests
+  , simulationTests
   ]
 
 tensor3Tests :: TestTree
@@ -79,7 +79,6 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
       V.fromList [LMove (V3 0 2 1) (V3 1 0 0), Wait, Flip,             Fill (V3 0 0 0), Halt]
       ] == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]]
     ]
-
 
 simulationTests :: TestTree
 simulationTests = testGroup "Simulation Tests" [simulationSMove]
