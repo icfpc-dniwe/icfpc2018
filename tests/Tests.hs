@@ -7,7 +7,7 @@ import Test.Tasty.QuickCheck as QC
 import Test.ChasingBottoms
 
 import ICFPC2018.Types
-import ICFPC2018.Tensor3 (Tensor3, Tensor3Idx)
+import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
 import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
@@ -30,13 +30,13 @@ instance Arbitrary a => Arbitrary (Tensor3 a) where
     values <- vectorOf (product size) arbitrary
     return $ T3.create (V.fromList values) size
 
-genT3Index :: Tensor3 a -> Gen Tensor3Idx
-genT3Index tensor = mapM (\sz -> choose (0, sz - 1)) (T3.size tensor)
+genI3 :: Tensor3 a -> Gen I3
+genI3 tensor = mapM (\sz -> choose (0, sz - 1)) (T3.size tensor)
 
 tensor3Flip :: TestTree
 tensor3Flip = QC.testProperty "Flip Tensor3 value" $ do
   tensor <- arbitrary `suchThat` ((/= 0) . product . T3.size)
-  i <- genT3Index tensor
+  i <- genI3 tensor
   let value = tensor T3.! i
       tensor' = T3.update tensor [(i, not value)]
       value' = tensor' T3.! i
