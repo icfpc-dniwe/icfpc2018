@@ -122,6 +122,14 @@ newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
 instance Arbitrary EmptySingleBotModel where
   arbitrary = getSize >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
 
+-- TODO
+-- newtype NonEmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
+-- instance Arbitrary EmptySingleBotModel where
+--   arbitrary = do
+--     n <- getSize
+--     return $ NonEmptySingleBotModel (startModel (V3 (max 1 n) (max 1 n) (max 1 n)))
+
+
 newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
 instance Arbitrary VolatileCoordinateWrapper where
   arbitrary = do
@@ -274,17 +282,28 @@ aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start fini
 packTests :: TestTree
 packTests = testGroup "Pack Tests" [
     emptyModelPackMove
-  -- , packNonEmptyModelMoveBFS
+--   , nonEmptyModelPackMove
   ]
+
+
+testPackMove :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Bool
+testPackMove m0 c c' = (isRight result) && (fromRight c (botPos <$> result) == c') where
+  m = m0 {botPos = c}
+  simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
+  cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) mlenMetric c c'
+  result = foldl simulateStep' (Right m) cmds
 
 emptyModelPackMove :: TestTree
 emptyModelPackMove = QC.testProperty "emptyModelPackMove" $ within (2 * 10^(6::Int)) $ \(
     EmptySingleBotModel m0
   , VolatileCoordinateWrapper c
   , VolatileCoordinateWrapper c'
-  ) -> let
-    m = m0 {botPos = c}
-    simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
-    cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) (\x x' -> mlen (x - x')) c c'
-    result = foldl simulateStep' (Right m) cmds
-    in (isRight result) && (fromRight c (botPos <$> result) == c')
+  ) -> testPackMove m0 c c'
+
+
+-- nonEmptyModelPackMove :: TestTree
+-- nonEmptyModelPackMove = QC.testProperty "nonEmptyModelPackMove" $ \(
+--     NonEmptySingleBotModel m0
+--   , VolatileCoordinateWrapper c
+--   , VolatileCoordinateWrapper c'
+--   ) -> testPackMove m0 c c'
