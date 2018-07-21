@@ -7,8 +7,10 @@ module ICFPC2018.Tensor3
   , size
   , update
   , create
+  , replicate
   ) where
 
+import Prelude hiding (replicate)
 import Control.Arrow
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -49,3 +51,6 @@ create :: Vector a -> Tensor3Size -> Tensor3 a
 create v sz
   | V.length v == product sz = Tensor3 v sz
   | otherwise = error "create: invalid tensor size"
+
+replicate :: Tensor3Size -> a -> Tensor3 a
+replicate sz v = Tensor3 (V.replicate (product sz) v) sz

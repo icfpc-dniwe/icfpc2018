@@ -6,7 +6,9 @@ import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
+import qualified ICFPC2018.Tensor3 as T3
 
+zero :: VolatileCoordinate
 zero = V3 0 0 0
 
 mkLinearDifference :: Axis -> Int -> Difference
@@ -24,10 +26,19 @@ normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
 packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
 -- stupid pack using only SMove and not checking collisions
 packMove (V3 xFrom yFrom zFrom) (V3 xTo yTo zTo)
-  | xFrom /= xTo = SMove (mkLinearDifference X (xTo - xFrom)) : packMove (V3 xTo yFrom zFrom) (V3 xTo yTo zTo)
-  | yFrom /= yTo = SMove (mkLinearDifference Y (yTo - yFrom)) : packMove (V3 xFrom yTo zFrom) (V3 xTo yTo zTo)
-  | zFrom /= zTo = SMove (mkLinearDifference Z (zTo - zFrom)) : packMove (V3 xFrom yFrom zTo) (V3 xTo yTo zTo)
+  | xFrom /= xTo = SMove (mkLinearDifference X distX) : packMove (V3 newX yFrom zFrom) (V3 xTo yTo zTo)
+  | yFrom /= yTo = SMove (mkLinearDifference Y distY) : packMove (V3 xFrom newY zFrom) (V3 xTo yTo zTo)
+  | zFrom /= zTo = SMove (mkLinearDifference Z distZ) : packMove (V3 xFrom yFrom newZ) (V3 xTo yTo zTo)
   | otherwise    = []
+    where
+      (distX, newX) = moveTowards xFrom xTo
+      (distY, newY) = moveTowards yFrom yTo
+      (distZ, newZ) = moveTowards zFrom zTo
+
+moveTowards :: Int -> Int -> (Int, Int)
+moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
+                    | to < from - maxLLD = (-maxLLD, from - maxLLD)
+                    | otherwise      = (to - from, to)
 
 simulateStep
   :: VolatileCoordinate
@@ -45,9 +56,12 @@ simulateStep c = \case
   cmd         -> error $ "TODO: simulateStep " ++ (show cmd)
 
 data SingleBotModel = SingleBotModel
-                      { botPos :: !(V3 Int)
+                      { botPos :: !VolatileCoordinate
                       , filledModel :: !Model
                       } deriving (Show, Eq)
+
+startModel :: V3 Int -> SingleBotModel
+startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
 
 packIntensions :: Intensions -> SingleBotModel -> Trace
 packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [V.singleton $ Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
