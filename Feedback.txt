@@ -1,0 +1,2 @@
+ - hmatrix does not have tensors implemented. Tesnsor3 implementation was needed.
+ - splitting BoundingBox along axis to N nearly equal BoundingBoxs implementation was needed.
