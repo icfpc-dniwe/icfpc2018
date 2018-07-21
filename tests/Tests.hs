@@ -227,28 +227,46 @@ simulationLMoveNonVoid = QC.testProperty "LMove: non void" $ \(
 -- A* tests
 --
 
-aStarTests :: TestTree
-aStarTests = testGroup "A* Tests" [aStarRandom, aStarGuaranteed]
+immediateNeighbours :: Model -> I3 -> [(I3, I3)]
+immediateNeighbours model p = filter (\(i, _) -> checkBounds (T3.size model) i && not (model T3.! i)) $ map (\step -> (p + step, step)) allNeighbours
+  where allNeighbours =
+          [ V3 (-1) 0    0
+          , V3 1    0    0
+          , V3 0    (-1) 0
+          , V3 0    1    0
+          , V3 0    0    (-1)
+          , V3 0    0    1
+          ]
 
-checkPath :: Model -> I3 -> I3 -> [I3] -> Bool
+immediateAStar :: Model -> I3 -> I3 -> Maybe [(I3, I3)]
+immediateAStar model = aStar (immediateNeighbours model) (\a b -> mlen (a - b))
+
+checkPath :: Model -> I3 -> I3 -> [(I3, I3)] -> Bool
 checkPath _ _ _ [] = False
-checkPath model start finish path0@(first:_)
+checkPath model start finish path0@((first, _):_)
   | first /= start = False
   | otherwise = not (model T3.! start) && go path0
   where go [] = error "checkPath: impossible"
-        go [current] = current == finish
-        go (current:path@(next:_)) = next `elem` neighbours current model && not (model T3.! next) && go path
+        go [(current, step)] = current + step == finish
+        go ((current, step):path@((next, _):_)) = isNeighbour && not obstructed && followsSteps && go path
+          where isNeighbour = next `elem` map fst (immediateNeighbours model current)
+                obstructed = model T3.! next
+                followsSteps = current + step == next
+
+aStarTests :: TestTree
+aStarTests = testGroup "A* Tests" [aStarRandom, aStarGuaranteed]
 
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
-  where testPassable model =
-          case aStar start finish model of
+aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` suitableModel) testPassable
+  where suitableModel model = product (T3.size model) /= 0 && not (model T3.! start)
+        start = 0
+        testPassable model =
+          case immediateAStar model start finish of
             Nothing -> True
             Just path -> checkPath model start finish path
-          where start = 0
-                finish = T3.size model - 1
+          where finish = T3.size model - 1
 
 aStarGuaranteed :: TestTree
-aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ aStar start finish testModel) @?= True
+aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ immediateAStar testModel start finish) @?= True
   where start = 0
         finish = (T3.size testModel - 1)
