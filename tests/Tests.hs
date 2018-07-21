@@ -80,7 +80,7 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
       [SMove (V3 0 2 1), Flip],
       [Fill (V3 2 1 1), Fill (V3 0 0 0)],
       [Halt, Halt]
-      ]) == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 30 + 3 + 3 + 3) * 27
+      ]) == sum [sum [0, 0, 6, 6, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 3 + 30 + 3 + 3) * 27
     ]
 
 simulationTests :: TestTree

@@ -14,10 +14,10 @@ validLinearDifference maxDist (V3 0 0 z) = abs z <= maxDist
 validLinearDifference _ _ = False
 
 validLongDifference :: LongDifference -> Bool
-validLongDifference = validLinearDifference 15
+validLongDifference = validLinearDifference maxLLD
 
 validShortDifference :: ShortDifference -> Bool
-validShortDifference = validLinearDifference 5
+validShortDifference = validLinearDifference maxSLD
 
 validNearDifference :: NearDifference -> Bool
 validNearDifference dist = mlen dist <= 2 && clen dist == 1
@@ -36,4 +36,3 @@ validCommand (FusionS nd) = validNearDifference nd
 validTrace :: Trace -> Bool
 validTrace = all validStep
   where validStep = all validCommand
-  
