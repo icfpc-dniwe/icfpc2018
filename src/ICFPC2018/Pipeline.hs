@@ -11,7 +11,7 @@ spawnBots :: Int -> Trace
 spawnBots = undefined
 
 sliceModel :: Model -> Int -> [T3.BoundingBox]
-sliceModel m0 numBots =
+sliceModel m0 numBots = undefined
   where
     modelBox = T3.boundingBox m0 id
     bottomLine = case modelBox of
