@@ -12,10 +12,8 @@ import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 import Linear.V3 (V3(..))
 
-import ICFPC2018.Tensor3 (Tensor3, I3)
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
-import ICFPC2018.Utils
 
 showLayer :: Int -> Model -> String
 showLayer y model = intercalate "\n" $ map showLine [0..zS-1]

@@ -4,7 +4,6 @@ module ICFPC2018.Scoring
   , scoreTrace
   ) where
 
-import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
 

@@ -11,7 +11,6 @@ import qualified Data.Map as M
 import Data.Binary.Get
 import Data.Binary.Put
 
-import Debug.Trace
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
 

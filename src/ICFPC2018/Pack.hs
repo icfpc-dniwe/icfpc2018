@@ -1,20 +1,16 @@
 module ICFPC2018.Pack where
 
-import Data.Vector (Vector)
 import Data.Maybe (fromMaybe)
-import qualified Data.Vector as V
-import qualified Data.Map as M
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
 import ICFPC2018.Model
-import ICFPC2018.Tensor3 (Tensor3, I3)
+import ICFPC2018.Tensor3 (I3)
 import Control.Monad.State.Strict
 import Control.Arrow (first)
-import qualified Data.Map.Strict as MS
-import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
 
 import qualified ICFPC2018.Tensor3 as T3
 
@@ -95,7 +91,7 @@ simulateStep = simulateStep' where
       c  = botPos m
       c' = c + d
       in do
-        checkBounds m c' >> checkVoidPath m c c'
+        checkStepBounds m c' >> checkVoidPath m c c'
         Right $ m {botPos = c'}
 
     LMove d1 d2 -> let
@@ -103,14 +99,14 @@ simulateStep = simulateStep' where
       c'  = c  + d1
       c'' = c' + d2
       in do
-        checkBounds m c'  >> checkVoidPath m c c'
-        checkBounds m c'' >> checkVoidPath m c' c''
+        checkStepBounds m c'  >> checkVoidPath m c c'
+        checkStepBounds m c'' >> checkVoidPath m c' c''
         Right $ m {botPos = c''}
 
     cmd -> error $ "TODO: simulateStep " ++ (show cmd)
 
-  checkBounds :: SingleBotModel -> VolatileCoordinate -> Either String ()
-  checkBounds m c = let
+  checkStepBounds :: SingleBotModel -> VolatileCoordinate -> Either String ()
+  checkStepBounds m c = let
     (V3 mx my mz) = T3.size . filledModel $ m
     (V3 cx cy cz) = c
     in when (not $ 0 <= cx && cx < mx && 0 <= cy && cy < my && 0 <= cz && cz < mz)
@@ -132,12 +128,12 @@ singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
 singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
 
 packIntensions :: SingleBotModel -> Intensions -> Trace
-packIntensions m xs = t1 ++ t2 where
-  (t1, m') = first concat . (flip runState m) . mapM packIntension $ xs
+packIntensions m0 xs = t1 ++ t2 where
+  (t1, m1) = first concat . (flip runState m0) . mapM packIntension $ xs
 
-  -- t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m') zero) ++ [Halt]
+  -- t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m1) zero) ++ [Halt]
   t2 = singleBotCommandsToTrace 0
-       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenMetric (botPos m') zero)
+       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m1) mlenMetric (botPos m1) zero)
        ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
@@ -158,24 +154,10 @@ packIntensions m xs = t1 ++ t2 where
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
 
---
-
-data MultiBotModel = MultiBotModel
-                     { botNum :: !Int
-                     , allBotPos :: ![VolatileCoordinate]
-                     , filledModelMulti :: !Model
-                     } deriving (Show, Eq)
-
-startMultiModel :: V3 Int -> MultiBotModel
-startMultiModel sz = MultiBotModel {botNum = 1, allBotPos = [V3 0 0 0], filledModelMulti = T3.replicate sz False}
-
-packMultiBot :: MultiBotModel -> Intensions -> Trace
-packMultiBot m0 intensions = undefined
-
 type YPlane = Int
 
-sliceIntensions :: Intensions -> MS.Map YPlane Intensions
-sliceIntensions intensions = foldr updateHelper MS.empty intensions
+sliceIntensions :: Intensions -> Map YPlane Intensions
+sliceIntensions intensions = foldr updateHelper M.empty intensions
   where
     updateHelper FlipGravity m = m
-    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.insertWith (++) y [intension] m
+    updateHelper intension@(FillIdx (V3 _ y _)) m = M.insertWith (++) y [intension] m
