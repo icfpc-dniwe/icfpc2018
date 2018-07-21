@@ -14,13 +14,13 @@ import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Validation
 
-data State = State { stateEnergy :: !Int
-                   , stateHarmonics :: !HarmonicState
-                   , stateMatrix :: !Model
-                   , stateBots :: !(Map BotIdx BotState)
-                   , stateHalted :: !Bool
-                   }
-           deriving (Show, Eq)
+data ExecState = ExecState { stateEnergy :: !Int
+                           , stateHarmonics :: !HarmonicState
+                           , stateMatrix :: !Model
+                           , stateBots :: !(Map BotIdx BotState)
+                           , stateHalted :: !Bool
+                           }
+                           deriving (Show, Eq)
 
 type SeedsSet = IntSet
 
@@ -36,19 +36,19 @@ data BotState = BotState { botPos :: !I3
                          }
               deriving (Show, Eq)
 
-initialState :: Model -> State
-initialState model = State { stateEnergy = 0
-                           , stateHarmonics = Low
-                           , stateMatrix = model
-                           , stateBots = M.singleton 1 initialBot
-                           , stateHalted = False
-                           }
+initialState :: Model -> ExecState
+initialState model = ExecState { stateEnergy = 0
+                               , stateHarmonics = Low
+                               , stateMatrix = model
+                               , stateBots = M.singleton 1 initialBot
+                               , stateHalted = False
+                               }
   where initialBot = BotState { botPos = 0
                               , botSeeds = IS.fromList [2..20]
                               }
 
-stepState :: State -> Step -> Maybe State
-stepState state@(State {..}) step = do
+stepState :: ExecState -> Step -> Maybe ExecState
+stepState state@(ExecState {..}) step = do
   guard $ not stateHalted
   guard $ M.keys step == M.keys stateBots
   let harmonicsCost = (if stateHarmonics == Low then 3 else 30) * product (T3.size stateMatrix)
@@ -59,8 +59,8 @@ stepState state@(State {..}) step = do
   -- FIXME: check connectivity
   return state2
 
-stepBot :: BotPositions -> Step -> (State, Set VolatileCoordinate) -> (BotIdx, Command) -> Maybe (State, Set VolatileCoordinate)
-stepBot botPositions step (state@State {..}, volatiles) (botIdx, command) =
+stepBot :: BotPositions -> Step -> (ExecState, Set VolatileCoordinate) -> (BotIdx, Command) -> Maybe (ExecState, Set VolatileCoordinate)
+stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
   case command of
     Halt -> do
       guard $ M.size stateBots == 1 && myPos == 0
@@ -114,9 +114,9 @@ linearPath from path
   | otherwise = next : linearPath next (path - step)
   where step = signum path
         next = from + step
-                                                      
-addVolatiles :: State -> Set VolatileCoordinate -> Set VolatileCoordinate -> Maybe (Set VolatileCoordinate)
-addVolatiles (State {..}) volatiles newVolatiles
+
+addVolatiles :: ExecState -> Set VolatileCoordinate -> Set VolatileCoordinate -> Maybe (Set VolatileCoordinate)
+addVolatiles (ExecState {..}) volatiles newVolatiles
   | S.null (volatiles `S.intersection` newVolatiles)
     && all (not . (stateMatrix T3.!)) newVolatiles = Just $ volatiles `S.union` newVolatiles
   | otherwise = Nothing
