@@ -13,10 +13,12 @@ type Model = Tensor3 Bool
 -- when perfroming a fusion, it takes back the bot id and its unused pool
 type BotIdx = Int
 type BotSeeds = IntSet
-data Bot = Bot !BotIdx !BotSeeds
+type BotPos = V3 Int
+data Bot = Bot !BotIdx !BotPos !BotSeeds
+    deriving (Show, Eq)
 
-primaryBot :: Int {-N seeeds-} -> Bot
-primaryBot n = Bot 0 $ IS.fromList $ [1..n]
+primaryBot :: BotPos -> Int {-N seeeds-} -> Bot
+primaryBot p n = Bot 0 p $ IS.fromList [1..n]
 
 type VolatileCoordinate = V3 Int
 type Difference = V3 Int
