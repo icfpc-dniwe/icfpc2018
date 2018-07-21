@@ -69,4 +69,5 @@ test-suite tests
   default-extensions:  ScopedTypeVariables
                      , LambdaCase
                      , RecordWildCards
+                     , TupleSections
   ghc-options:         -Wall

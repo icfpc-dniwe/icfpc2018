@@ -62,3 +62,8 @@ maxSLD = 5
 
 maxLLD :: Int
 maxLLD = 15
+
+mkLinearDifference :: Axis -> Int -> Difference
+mkLinearDifference X v = V3 v 0 0
+mkLinearDifference Y v = V3 0 v 0
+mkLinearDifference Z v = V3 0 0 v

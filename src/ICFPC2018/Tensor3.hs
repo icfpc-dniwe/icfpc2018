@@ -11,6 +11,7 @@ module ICFPC2018.Tensor3
   , replicate
   , boundingBox
   , slice
+  , inBounds
   ) where
 
 import Prelude hiding (replicate)
@@ -42,7 +43,7 @@ tensorIdx linIdx (V3 xSize ySize zSize) = (V3 x y z) where
 
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
 checkedLinearIdx sz idx
-  | checkBounds sz idx = linearIdx sz idx
+  | inBox sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
 size :: Tensor3 a -> Tensor3Size
@@ -81,6 +82,9 @@ boundingBox tensor pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) (indexing sz)
 
 slice :: Tensor3 a -> BoundingBox -> [I3]
 slice tensor ((V3 x0 y0 z0), (V3 x1 y1 z1)) = filter (\(V3 x y z) -> all id [x0 <= x, x1 >= x, y0 <= y, y1 >= y, z0 <= z, z1 >= z]) $ indexing $ size tensor
+
+inBounds :: Tensor3 a -> I3 -> Bool
+inBounds tensor = inBox (size tensor)
 
 instance Foldable Tensor3 where
   foldMap fun (Tensor3 v _) = foldMap fun v

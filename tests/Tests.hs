@@ -8,16 +8,12 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
-import Data.Either (isLeft, isRight, fromRight)
-import Data.Maybe (fromMaybe)
-import Linear.Vector ((*^))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Simulation
 import ICFPC2018.Model
-import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
@@ -64,6 +60,32 @@ tensor3InvalidIndex = QC.testProperty "Invalid Tensor3 index" $ \(tensor :: Tens
 tensor3InvalidUpdate :: TestTree
 tensor3InvalidUpdate = QC.testProperty "Invalid Tensor3 update" $ \(tensor :: Tensor3 ()) -> isBottom $ T3.update tensor [(T3.size tensor, ())]
 
+--
+-- Simulation tests
+--
+
+instance Arbitrary ExecState where
+  arbitrary = do
+    r <- getSize
+    let size = fromIntegral (r + 1)
+        empty = T3.create (V.replicate (product size) False) size
+        maybeFilled = T3.slice empty (V3 1 0 1, fromIntegral (r - 1))
+    filled <- filter snd <$> mapM (\i -> (i, ) <$> arbitrary) maybeFilled
+    let model = T3.update empty filled
+    return $ initialState model
+
+instance Arbitrary Axis where
+  arbitrary = arbitraryBoundedEnum
+
+genLinearDifference :: Int -> Gen I3
+genLinearDifference maxLen = mkLinearDifference <$> arbitrary <*> choose (0, maxLen)
+
+genLongDifference :: Gen I3
+genLongDifference = genLinearDifference maxLLD
+
+genShortDifference :: Gen I3
+genShortDifference = genLinearDifference maxSLD
+
 testModel :: Model
 testModel = T3.create
             (V.fromList
@@ -80,163 +102,56 @@ testModel = T3.create
               , False, False, False
               ]) (V3 3 3 3)
 
-testScoring :: TestTree
-testScoring = testGroup "Scoring for commands"
-  [ HU.testCase "Halt" $ scoreOne Halt @?= 0
-  , HU.testCase "Wait" $ scoreOne Wait @?= 0
-  , HU.testCase "Flip" $ scoreOne Flip @?= 0
-  , HU.testCase "SMove" $ scoreOne (SMove (V3 0 2 1)) @?= 2 * 3
-  , HU.testCase "LMove" $ scoreOne (LMove (V3 0 2 1) (V3 1 0 0)) @?= 2 * (2 + 1 + 2)
-  , HU.testCase "Fission" $ scoreOne (Fission (V3 1 1 1) 1) @?= 24
-  , HU.testCase "FusionP" $ scoreOne (FusionP (V3 1 1 1)) @?= -24
-  , HU.testCase "FusionS" $ scoreOne (FusionS (V3 1 1 1)) @?= 0
-  , HU.testCase "Fill empty" $ scoreOne (Fill (V3 0 0 0)) @?= 12
-  , HU.testCase "Fill again" $ scoreOne (Fill (V3 2 1 1)) @?= 6
-  , HU.testCase "scoreTrace" $ scoreTrace testModel testTrace @?= testTraceScore
-  ]
-  where scoreOne = scoreCommand testModel
-        testTrace = M.fromList <$> zip [0, 1] <$>
-                    [ [Wait, LMove (V3 0 2 1) (V3 1 0 0)]
-                    , [Flip, Wait]
-                    , [SMove (V3 0 2 1), Flip]
-                    , [Fill (V3 2 1 1), Fill (V3 0 0 0)]
-                    , [Halt, Halt]
-                    ]
-        testTraceScore = sum [sum [0, 0, 6, 12 {-6-}, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 3 + 30 + 3 + 3) * 27
-
---
--- Simulation tests
---
-
 simulationTests :: TestTree
 simulationTests = testGroup "Simulation Tests" [
     simulationSMove
   , simulationSMoveOutOfBounds
-  , simulationSMoveNonVoid
   , simulationLMove
   , simulationLMoveOutOfBounds
-  , simulationLMoveNonVoid
   ]
 
-newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
-instance Arbitrary EmptySingleBotModel where
-  arbitrary = getSize >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
-
--- TODO
--- newtype NonEmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
--- instance Arbitrary EmptySingleBotModel where
---   arbitrary = do
---     n <- getSize
---     return $ NonEmptySingleBotModel (startModel (V3 (max 1 n) (max 1 n) (max 1 n)))
-
-
-newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
-instance Arbitrary VolatileCoordinateWrapper where
-  arbitrary = do
-    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, max 0 (s - 1))
-    return $ VolatileCoordinateWrapper (V3 x y z)
-
-instance Arbitrary Axis where
-  arbitrary = arbitraryBoundedEnum
-
-newtype LongDifferenceWrapper = LongDifferenceWrapper LongDifference deriving Show
-instance Arbitrary LongDifferenceWrapper where
-  arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxLLD)))
-
-newtype ShortDifferenceWrapper = ShortDifferenceWrapper ShortDifference deriving Show
-instance Arbitrary ShortDifferenceWrapper where
-  arbitrary = ShortDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxSLD)))
-
-isBounded :: SingleBotModel -> VolatileCoordinate -> Bool
-isBounded m r = let
-  (V3 mx my mz) = T3.size $ filledModel m
-  (V3 rx ry rz) = r
-  in (0 <= rx && rx < mx) && (0 <= ry && ry < my) && (0 <= rz && rz < mz)
+goodStep :: Model -> I3 -> I3 -> Bool
+goodStep model start step = T3.inBounds model (start + step) && all (not . (model T3.!)) (linearPath start step)
 
 simulationSMove :: TestTree
-simulationSMove = QC.testProperty "SMove" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , LongDifferenceWrapper d
-  ) -> isBounded m (c+d) ==> isRight $ simulateStep m {botPos = c} (SMove d)
+simulationSMove = QC.testProperty "SMove" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, step) -> isJust $ stepState state (M.singleton 1 $ SMove step)
+  where testValues = do
+          state <- arbitrary
+          step <- genLongDifference `suchThat` goodStep (stateMatrix state) 0
+          return (state, step)
 
 simulationSMoveOutOfBounds :: TestTree
-simulationSMoveOutOfBounds = QC.testProperty "SMove: out of bounds" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , axis
-  , dir
-  ) -> let
-    l = maximum (T3.size $ filledModel m)
-    d = mkLinearDifference axis ((if dir then 1 else (-1)) * l)
-    in isLeft $ simulateStep m {botPos = c} (SMove d)
-
-simulationSMoveNonVoid :: TestTree
-simulationSMoveNonVoid = QC.testProperty "SMove: non void" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , LongDifferenceWrapper d
-  , NonEmpty ps
-  ) -> let
-    l = mlen d + 1
-    n = normalizeLinearDifference d
-    ps' = map (`mod` l) ps
-    updates = zip (map (\i -> c + i*^n) ps') (repeat True)
-    m' = m {
-        botPos = c
-      , filledModel = T3.update (filledModel m) updates
-      }
-    in isBounded m (c+d) ==> isLeft $ simulateStep m' (SMove d)
-
+simulationSMoveOutOfBounds = QC.testProperty "SMove: out of bounds" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, step) -> isNothing $ stepState state (M.singleton 1 $ SMove step)
+  where testValues = do
+          state <- arbitrary
+          step <- mkLinearDifference <$> arbitrary <*> pure (maximum $ T3.size $ stateMatrix state)
+          return (state, step)
 
 simulationLMove :: TestTree
-simulationLMove = QC.testProperty "LMove" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , ShortDifferenceWrapper d1, ShortDifferenceWrapper d2
-  ) -> isBounded m (c+d1) && isBounded m (c+d1+d2) ==> isRight $ simulateStep m {botPos = c} (LMove d1 d2)
-
+simulationLMove = QC.testProperty "LMove" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, d1, d2) -> isJust $ stepState state (M.singleton 1 $ LMove d1 d2)
+  where testValues = do
+          state <- arbitrary
+          d1 <- genShortDifference `suchThat` goodStep (stateMatrix state) 0
+          d2 <- genShortDifference `suchThat` goodStep (stateMatrix state) d1
+          return (state, d1, d2)
 
 simulationLMoveOutOfBounds :: TestTree
-simulationLMoveOutOfBounds = QC.testProperty "LMove: out of bounds" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , axis
-  , dir
-  ) -> let
-    l = maximum (T3.size $ filledModel m)
-    d = mkLinearDifference axis ((if dir then 1 else (-1)) * l)
-    in isLeft $ simulateStep m {botPos = c} (LMove d (-d))
-
-
-simulationLMoveNonVoid :: TestTree
-simulationLMoveNonVoid = QC.testProperty "LMove: non void" $ \(
-    EmptySingleBotModel m
-  , VolatileCoordinateWrapper c
-  , ShortDifferenceWrapper d1, ShortDifferenceWrapper d2
-  , NonEmpty ps1, NonEmpty ps2
-  ) -> let
-    l1 = mlen d1 + 1
-    l2 = mlen d2 + 1
-    n1 = normalizeLinearDifference d1
-    n2 = normalizeLinearDifference d2
-    ps1' = map (`mod` l1) ps1
-    ps2' = map (`mod` l2) ps2
-    updates1 = zip (map (\i -> c + i*^n1) ps1') (repeat True)
-    updates2 = zip (map (\i -> c + d1 + i*^n2) ps2') (repeat True)
-    m' = m {
-        botPos = c
-      , filledModel = T3.update (filledModel m) (updates1 ++ updates2)
-      }
-    in isBounded m (c+d1) && isBounded m (c+d1+d2) ==>
-       isLeft $ simulateStep m' (LMove d1 d2)
+simulationLMoveOutOfBounds = QC.testProperty "LMove: out of bounds" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, d1, d2) -> isNothing $ stepState state (M.singleton 1 $ LMove d1 d2)
+  where testValues = do
+          state <- arbitrary
+          d1 <- mkLinearDifference <$> arbitrary <*> pure (maximum $ T3.size $ stateMatrix state)
+          return (state, d1, -d1)
 
 --
 -- A* tests
 --
 
 immediateNeighbours :: Model -> I3 -> [(I3, I3)]
-immediateNeighbours model p = filter (\(i, _) -> checkBounds (T3.size model) i && not (model T3.! i)) $ map (\step -> (p + step, step)) allNeighbours
+immediateNeighbours model p = filter (\(i, _) -> T3.inBounds model i && not (model T3.! i)) $ map (\step -> (p + step, step)) allNeighbours
   where allNeighbours =
           [ V3 (-1) 0    0
           , V3 1    0    0
@@ -281,24 +196,24 @@ aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start fini
 
 packTests :: TestTree
 packTests = testGroup "Pack Tests" [
-    emptyModelPackMove
+    -- emptyModelPackMove
 --   , nonEmptyModelPackMove
   ]
 
 
-testPackMove :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Bool
-testPackMove m0 c c' = (isRight result) && (fromRight c (botPos <$> result) == c') where
-  m = m0 {botPos = c}
+{-testPackMove :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Bool
+testPackMove m0 c c' = (isRight result) && (fromRight c (singleBotPos <$> result) == c') where
+  m = m0 {singleBotPos = c}
   simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
   cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) mlenMetric c c'
-  result = foldl simulateStep' (Right m) cmds
+  result = foldl simulateStep' (Right m) cmds-}
 
-emptyModelPackMove :: TestTree
+{-emptyModelPackMove :: TestTree
 emptyModelPackMove = QC.testProperty "emptyModelPackMove" $ within (2 * 10^(6::Int)) $ \(
     EmptySingleBotModel m0
   , VolatileCoordinateWrapper c
   , VolatileCoordinateWrapper c'
-  ) -> testPackMove m0 c c'
+  ) -> testPackMove m0 c c'-}
 
 
 -- nonEmptyModelPackMove :: TestTree
