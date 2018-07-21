@@ -7,6 +7,7 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
+import Linear.V3 (V3(..))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -68,23 +69,27 @@ stepBot botPositions step (state@State {..}, volatiles) (botIdx, command) =
     Wait -> Just (state, volatiles)
     Flip -> Just (state { stateHarmonics = changeHarmonic stateHarmonics }, volatiles)
     SMove lld -> do
-      guard $ validLongDifference lld
+      let newPos = myPos + lld
+      guard $ validLongDifference lld && inBounds newPos
       volatiles' <- addVolatiles state volatiles (S.fromList $ linearPath myPos lld)
-      return ((insertBot $ botState { botPos = myPos + lld }) { stateEnergy = stateEnergy + 2 * mlen lld }, volatiles')
+      let newBots = M.insert botIdx (botState { botPos = newPos }) stateBots
+      return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * mlen lld }, volatiles')
     LMove sld1 sld2 -> do
-      guard $ validShortDifference sld1 && validShortDifference sld2
+      let newPos = myPos + sld1 + sld2
+      guard $ validShortDifference sld1 && validShortDifference sld2 && inBounds newPos
       volatiles' <- addVolatiles state volatiles (S.fromList $ linearPath myPos sld1 ++ linearPath (myPos + sld1) sld2)
-      return ((insertBot $ botState { botPos = myPos + sld1 + sld2 }) { stateEnergy = stateEnergy + 2 * (clen sld1 + clen sld2 + 2) }, volatiles')
+      let newBots = M.insert botIdx (botState { botPos = newPos }) stateBots
+      return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * (clen sld1 + clen sld2 + 2) }, volatiles')
     Fill nd -> do
-      guard $ validNearDifference nd
       let pos = myPos + nd
           curr = stateMatrix T3.! pos
+      guard $ validNearDifference nd && inBounds pos
       volatiles' <- addVolatiles state volatiles (S.singleton pos)
       return (state { stateMatrix = T3.update stateMatrix [(pos, True)], stateEnergy = stateEnergy + (if curr then 6 else 12) }, volatiles')
     Fission nd m -> do
       let (childId:childSeeds, parentSeeds) = splitAt (m + 1) $ IS.toAscList $ botSeeds botState
           childPos = myPos + nd
-      guard $ validNearDifference nd
+      guard $ validNearDifference nd && inBounds childPos
       volatiles' <- addVolatiles state volatiles (S.singleton childPos)
       let newBots = M.insert botIdx (botState { botSeeds = IS.fromList parentSeeds }) $
                     M.insert childId (BotState { botPos = childPos
@@ -93,8 +98,8 @@ stepBot botPositions step (state@State {..}, volatiles) (botIdx, command) =
                     stateBots
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 24 }, volatiles')
     FusionP nd -> do
-      guard $ validNearDifference nd
       let childPos = myPos + nd
+      guard $ validNearDifference nd && inBounds childPos
       childIdx <- M.lookup childPos botPositions
       let FusionS childNd = step M.! childIdx
       guard $ childPos + childNd == myPos
@@ -106,7 +111,8 @@ stepBot botPositions step (state@State {..}, volatiles) (botIdx, command) =
     FusionS _ -> return (state, volatiles)
   where botState = stateBots M.! botIdx
         myPos = botPos botState
-        insertBot botState' = state { stateBots = M.insert botIdx botState' stateBots }
+        V3 xS yS zS = T3.size stateMatrix
+        inBounds (V3 x y z) = x >= 0 && y >= 0 && z >= 0 && x < xS && y < yS && z < zS
 
 linearPath :: I3 -> I3 -> [I3]
 linearPath from path
