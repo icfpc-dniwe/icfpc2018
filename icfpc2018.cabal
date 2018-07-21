@@ -14,7 +14,7 @@ library
                      , ICFPC2018.Utils
                      , ICFPC2018.Tensor3
                      , ICFPC2018.Scoring
-                     , ICFPC2018.Simulation
+                     , ICFPC2018.Pack
                      , ICFPC2018.IO
                      , ICFPC2018.Model
                      , ICFPC2018.Validation
@@ -59,12 +59,9 @@ test-suite tests
                      , tasty-quickcheck
                      , tasty-hunit
                      , ChasingBottoms
-                     , linear
-                     , containers
                      , vector
-                     , mtl
-                     , pqueue
-  hs-source-dirs:      src
+                     , containers
+                     , linear
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   default-language:    Haskell2010

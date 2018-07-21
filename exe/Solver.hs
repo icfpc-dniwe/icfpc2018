@@ -6,7 +6,7 @@ import Data.Binary.Put
 import Linear.V3 (V3(..))
 
 import ICFPC2018.IO
-import ICFPC2018.Simulation
+import ICFPC2018.Pack
 import ICFPC2018.Validation
 import ICFPC2018.Solvers.HighSolver
 import ICFPC2018.Scoring
