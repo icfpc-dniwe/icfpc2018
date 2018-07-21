@@ -76,6 +76,10 @@ boundingBox tensor@(Tensor3 v sz) pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) 
       | pr (tensor ! idx) = (min <$> idx <*> closest, max <$> idx <*> farthest)
       | otherwise = bbox
 
+slice :: Tensor3 a -> BoundingBox -> [I3]
+slice tensor (b0, b1) = filter (\v -> checkBouningBox b0 b1 v) indexing where
+  checkBoundingBox (V3 x0 y0 z0) (V3 x1 y1 z1) (V3 x y z) = all [x0 <= x, x1 >= x, y0 <= y, y1 >= y, z0 <= z, z1 >= z]
+
 instance Foldable Tensor3 where
   foldMap fun (Tensor3 v sz) = foldMap fun v
 

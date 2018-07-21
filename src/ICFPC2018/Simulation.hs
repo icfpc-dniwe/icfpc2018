@@ -116,8 +116,6 @@ packIntensions m xs = t1 ++ t2 ++ [] where
 
 --
 
---
-
 data MultiBotModel = MultiBotModel
                      { botNum :: !Int
                      , allBotPos :: ![VolatileCoordinate]
