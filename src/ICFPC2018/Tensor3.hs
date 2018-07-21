@@ -1,6 +1,7 @@
 module ICFPC2018.Tensor3
   ( Tensor3Size
   , I3
+  , BoundingBox
   , Tensor3
   , index
   , (!)

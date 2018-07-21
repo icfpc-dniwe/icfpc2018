@@ -19,7 +19,7 @@ library
                      , ICFPC2018.Model
                      , ICFPC2018.Validation
                      , ICFPC2018.Solvers.HighSolver
-                     , ICFPC2018.Solvers.ColumnSolver
+  --                   , ICFPC2018.Solvers.ColumnSolver
                      , ICFPC2018.Primitives
   -- other-modules:
   -- other-extensions:
@@ -31,6 +31,7 @@ library
                      , vector
                      , pqueue
                      , mtl
+                     , monad-loops
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  BinaryLiterals
