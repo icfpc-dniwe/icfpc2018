@@ -37,6 +37,9 @@ executable solver
   main-is:             Solver.hs
   build-depends:       base >=4.10
                      , icfpc2018
+                     , bytestring
+                     , binary
+                     , linear
   hs-source-dirs:      exe
   default-language:    Haskell2010
   ghc-options:         -Wall
