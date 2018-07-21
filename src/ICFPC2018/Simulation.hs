@@ -10,6 +10,7 @@ import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
 import Control.Monad.State.Strict
 import Control.Arrow (first)
+import qualified Data.Map.Strict as MS
 
 
 zero :: VolatileCoordinate
@@ -85,3 +86,23 @@ packIntensions m xs = t1 ++ t2 ++ [] where
       return (map V.singleton $ packMove botPos upIdx ++ [Fill lowerVoxel])
 
     FlipGravity -> return $ [V.singleton Flip]
+
+data MultiBotModel = MultiBotModel
+                     { botNum :: !Int
+                     , allBotPos :: ![VolatileCoordinate]
+                     , filledModelMulti :: !Model
+                     } deriving (Show, Eq)
+
+startMultiModel :: V3 Int -> MultiBotModel
+startMultiModel sz = MultiBotModel {botNum = 1, allBotPos = [V3 0 0 0], filledModelMulti = T3.replicate sz False}
+
+packMultiBot :: MultiBotModel -> Intensions -> Trace
+packMultiBot m0 intensions = undefined
+
+type YPlane = Int
+
+sliceIntensions :: Intensions -> MS.Map YPlane Intensions
+sliceIntensions intensions = foldr updateHelper MS.empty intensions
+  where
+    updateHelper FlipGravity m = m
+    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.insertWith (++) y [intension] m
