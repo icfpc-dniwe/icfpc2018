@@ -5,12 +5,13 @@ import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
-import ICFPC2018.Types
-import ICFPC2018.Utils
-import qualified ICFPC2018.Tensor3 as T3
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 import qualified Data.Map.Strict as MS
+
+import ICFPC2018.Types
+import ICFPC2018.Utils
+import qualified ICFPC2018.Tensor3 as T3
 
 
 data SingleBotModel = SingleBotModel {

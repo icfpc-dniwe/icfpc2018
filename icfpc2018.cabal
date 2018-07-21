@@ -55,7 +55,7 @@ test-suite tests
                      , icfpc2018
                      , tasty
                      , tasty-quickcheck
-                     , QuickCheck
+                     , tasty-hunit
                      , ChasingBottoms
                      , linear
                      , containers
