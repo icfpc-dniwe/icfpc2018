@@ -18,6 +18,8 @@ import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
 import ICFPC2018.Utils
 
+import Debug.Trace
+
 neighbours :: I3 -> Model -> [I3]
 neighbours p model = filter (checkBounds (T3.size model)) $ map (p +) allNeighbours
   where allNeighbours =
