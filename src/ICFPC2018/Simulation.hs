@@ -115,6 +115,10 @@ packIntensions m xs = t1 ++ t2 ++ [] where
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
 
+--
+
+--
+
 data MultiBotModel = MultiBotModel
                      { botNum :: !Int
                      , allBotPos :: ![VolatileCoordinate]
