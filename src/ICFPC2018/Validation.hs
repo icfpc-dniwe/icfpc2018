@@ -1,5 +1,8 @@
 module ICFPC2018.Validation
   ( validTrace
+  , validLongDifference
+  , validShortDifference
+  , validNearDifference
   ) where
 
 import Linear.V3 (V3(..))

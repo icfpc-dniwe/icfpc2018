@@ -1,5 +1,5 @@
 { mkDerivation, base, binary, bytestring, ChasingBottoms
-, containers, linear, pqueue, QuickCheck, stdenv, tasty
+, containers, linear, mtl, pqueue, stdenv, tasty, tasty-hunit
 , tasty-quickcheck, vector
 }:
 mkDerivation {
@@ -9,11 +9,12 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base binary bytestring containers linear pqueue vector
+    base binary bytestring containers linear mtl pqueue vector
   ];
-  executableHaskellDepends = [ base ];
+  executableHaskellDepends = [ base binary bytestring linear ];
   testHaskellDepends = [
-    base ChasingBottoms linear QuickCheck tasty tasty-quickcheck vector
+    base ChasingBottoms containers linear tasty tasty-hunit
+    tasty-quickcheck vector
   ];
   license = stdenv.lib.licenses.bsd3;
 }
