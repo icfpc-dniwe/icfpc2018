@@ -1,16 +1,20 @@
 module ICFPC2018.Simulation where
 
 import Data.Vector (Vector)
+import Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
+import ICFPC2018.Types
+import ICFPC2018.Utils
+import ICFPC2018.Tensor3 (Tensor3)
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 import qualified Data.Map.Strict as MS
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
-import ICFPC2018.Types
-import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
 
 
@@ -53,6 +57,10 @@ moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
                     | otherwise      = (to - from, to)
 
 
+packMoveBFS :: SingleBotModel -> VolatileCoordinate -> Maybe [Command]
+packMoveBFS m end = Nothing -- TODO
+
+
 simulateStep :: SingleBotModel -> Command -> Either String SingleBotModel
 simulateStep = simulateStep' where
 
@@ -79,7 +87,7 @@ simulateStep = simulateStep' where
   checkBounds m c = let
     (V3 mx my mz) = T3.size . filledModel $ m
     (V3 cx cy cz) = c
-    in when (not $ 0 < cx && cx < mx && 0 < cy && cy < my && 0 < cz && cz < mz)
+    in when (not $ 0 <= cx && cx < mx && 0 <= cy && cy < my && 0 <= cz && cz < mz)
        $ Left $ "out of bounds: " ++ show c
 
   checkVoidPath :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Either String ()
@@ -98,9 +106,12 @@ singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
 singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
 
 packIntensions :: SingleBotModel -> Intensions -> Trace
-packIntensions m xs = t1 ++ t2 ++ [] where
+packIntensions m xs = t1 ++ t2 where
   (t1, m') = first concat . (flip runState m) . mapM packIntension $ xs
-  t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m') zero) ++ [Halt]
+  -- t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m') zero) ++ [Halt]
+  t2 = singleBotCommandsToTrace 0
+       $ (fromMaybe (error "unable to return to zero") (packMoveBFS m' zero))
+       ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
   packIntension = \case
@@ -109,9 +120,14 @@ packIntensions m xs = t1 ++ t2 ++ [] where
 
       let lowerVoxel = V3 0 (-1) 0
       let upIdx      = idx + (V3 0 1 0)
+      let m'         = SingleBotModel {botPos = upIdx, ..}
 
-      put (SingleBotModel {botPos = upIdx, ..})
-      return $ singleBotCommandsToTrace 0 $ packMove botPos upIdx ++ [Fill lowerVoxel]
+      put m'
+
+      -- return $ singleBotCommandsToTrace 0 $ packMove botPos upIdx ++ [Fill lowerVoxel]
+      return $ singleBotCommandsToTrace 0
+        $ (fromMaybe (error "unable to return to zero") (packMoveBFS m' upIdx))
+        ++ [Fill lowerVoxel]
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
 

@@ -8,7 +8,8 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
-import Data.Either (isLeft, isRight)
+import Data.Either (isLeft, isRight, fromRight)
+import Data.Maybe (fromMaybe)
 import Linear.Vector ((*^))
 
 import ICFPC2018.Types
@@ -27,6 +28,7 @@ tests = testGroup "Tests"
   [ tensor3Tests
   , simulationTests
   , aStarTests
+--   , packTests
   ]
 
 --
@@ -38,7 +40,8 @@ tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tens
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
-    size <- V3 <$> getSize <*> getSize <*> getSize
+    let getSize' = choose (0, 32)
+    size <- V3 <$> getSize' <*> getSize' <*> getSize'
     values <- vectorOf (product size) arbitrary
     return $ T3.create (V.fromList values) size
 
@@ -123,7 +126,7 @@ instance Arbitrary EmptySingleBotModel where
 newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
 instance Arbitrary VolatileCoordinateWrapper where
   arbitrary = do
-    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, s)
+    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, max 0 (s - 1))
     return $ VolatileCoordinateWrapper (V3 x y z)
 
 instance Arbitrary Axis where
@@ -137,12 +140,11 @@ newtype ShortDifferenceWrapper = ShortDifferenceWrapper ShortDifference deriving
 instance Arbitrary ShortDifferenceWrapper where
   arbitrary = ShortDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxSLD)))
 
-
 isBounded :: SingleBotModel -> VolatileCoordinate -> Bool
 isBounded m r = let
   (V3 mx my mz) = T3.size $ filledModel m
   (V3 rx ry rz) = r
-  in (0 < rx && rx < mx) && (0 < ry && ry < my) && (0 < rz && rz < mz)
+  in (0 <= rx && rx < mx) && (0 <= ry && ry < my) && (0 <= rz && rz < mz)
 
 simulationSMove :: TestTree
 simulationSMove = QC.testProperty "SMove" $ \(
@@ -233,13 +235,13 @@ checkPath :: Model -> I3 -> I3 -> [I3] -> Bool
 checkPath _ _ _ [] = False
 checkPath model start finish path0@(first:_)
   | first /= start = False
-  | otherwise = go path0
+  | otherwise = not (model T3.! start) && go path0
   where go [] = error "checkPath: impossible"
         go [current] = current == finish
-        go (current:path@(next:_)) = next `elem` neighbours current model && go path
+        go (current:path@(next:_)) = next `elem` neighbours current model && not (model T3.! next) && go path
 
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* Random Models Passable" $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
+aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
   where testPassable model =
           case aStar start finish model of
             Nothing -> True
@@ -251,3 +253,20 @@ aStarGuaranteed :: TestTree
 aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ aStar start finish testModel) @?= True
   where start = 0
         finish = (T3.size testModel - 1)
+
+packTests :: TestTree
+packTests = testGroup "Pack Tests" [
+    emptyModelPackMoveBFS
+  -- , packNonEmptyModelMoveBFS
+  ]
+
+emptyModelPackMoveBFS :: TestTree
+emptyModelPackMoveBFS = QC.testProperty "emptyModelPackMoveBFS" $ \(
+    EmptySingleBotModel m0
+  , VolatileCoordinateWrapper c
+  , VolatileCoordinateWrapper c'
+  ) -> let
+    m = m0 {botPos = c}
+    simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
+    result = foldl simulateStep' (Right m) (fromMaybe [] $ packMoveBFS m c')
+    in (isRight result) && (fromRight c (botPos <$> result) == c')

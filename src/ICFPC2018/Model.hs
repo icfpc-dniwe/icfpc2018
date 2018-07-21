@@ -18,10 +18,8 @@ import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
 import ICFPC2018.Utils
 
-import Debug.Trace
-
 neighbours :: I3 -> Model -> [I3]
-neighbours p model = filter (checkBounds (T3.size model)) $ map (p +) allNeighbours
+neighbours p model = filter (\i -> checkBounds (T3.size model) i && not (model T3.! i)) $ map (p +) allNeighbours
   where allNeighbours =
           [ V3 (-1) 0    0
           , V3 1    0    0
@@ -59,5 +57,5 @@ aStar start finish model = go (PQ.singleton (mlen (finish - start)) start) S.emp
                             cameFrom' = M.insert neighbour current cameFrom
                             gScore' = M.insert neighbour tentativeScore gScore
         traverseBack cameFrom current path
-          | current == start = path
+          | current == start = current : path
           | otherwise = traverseBack cameFrom (cameFrom M.! current) (current : path)
