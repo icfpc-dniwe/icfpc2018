@@ -74,7 +74,7 @@ neighbours = result where
   genSLN :: Model -> I3 -> Int -> I3 -> [I3]
   genSLN m c l n
     = takeWhile (\i -> checkBounds (T3.size m) i && (not $ m T3.! i))
-    . map (\j -> j *^ n)
+    . map (\j -> c + j *^ n)
     $ [1..l]
 
   genSL :: Model -> I3 -> Int -> [I3]
@@ -83,8 +83,6 @@ neighbours = result where
   result m c
     =   map (\c' -> (c', SMove (c' - c))) (genSL m c 15)
     ++  concatMap (\c' -> map (\c'' -> (c'', LMove (c' - c) (c'' - c')))  (genSL m c' 5)) (genSL m c 5)
-
-
 
 simulateStep :: SingleBotModel -> Command -> Either String SingleBotModel
 simulateStep = simulateStep' where
