@@ -23,21 +23,17 @@ data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
                deriving (Show, Eq)
 
 linearIdx :: Tensor3Size -> I3 -> Int
-linearIdx (V3 xSize ySize _) (V3 xIdx yIdx zIdx) = xIdx + yIdx * xSize + zIdx * xSize * ySize
+linearIdx (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
 
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
 checkedLinearIdx sz idx
   | checkBounds sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
-tensorIdx :: Tensor3Size -> Int -> I3
-tensorIdx (V3 xSize ySize _) idx = V3 xIdx yIdx zIdx
-  where (zIdx, surfIdx) = idx `divMod` (xSize * ySize)
-        (yIdx, xIdx) = surfIdx `divMod` ySize
-
 size :: Tensor3 a -> Tensor3Size
 size (Tensor3 _ sz) = sz
 
+infixl 9 `index`
 index :: Tensor3 a -> I3 -> a
 index (Tensor3 v sz) idx = v `V.unsafeIndex` checkedLinearIdx sz idx
 

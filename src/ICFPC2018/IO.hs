@@ -10,6 +10,7 @@ import qualified Data.Vector as V
 import Data.Binary.Get
 import Data.Binary.Put
 
+import Debug.Trace
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
 
@@ -20,7 +21,7 @@ getBits size = go size 0 0 []
         go left 0 _ res = do
           newByte <- getWord8
           go left 8 newByte res
-        go left byteLeft byte res = go (left - 1) (byteLeft - 1) (byte `shiftL` 1) (((byte .&. 1) == 1) : res)
+        go left byteLeft byte res = go (left - 1) (byteLeft - 1) (byte `shiftR` 1) (((byte .&. 1) == 1) : res)
 
 getModel :: Get Model
 getModel = do
