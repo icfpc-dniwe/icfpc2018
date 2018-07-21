@@ -9,6 +9,7 @@ import ICFPC2018.Types
 import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
 import Control.Monad.State.Strict
+import Control.Arrow (first)
 
 
 zero :: VolatileCoordinate
@@ -68,7 +69,9 @@ startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz Fal
 
 
 packIntensions :: SingleBotModel -> Intensions -> Trace
-packIntensions m0 = concat . (flip evalState m0) . mapM packIntension where
+packIntensions m xs = t1 ++ t2 ++ [] where
+  (t1, m') = first concat . (flip runState m) . mapM packIntension $ xs
+  t2 = map V.singleton $ (packMove (botPos m') zero) ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
   packIntension = \case
