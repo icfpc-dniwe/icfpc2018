@@ -67,7 +67,7 @@ indexing :: Tensor3Size -> [I3]
 indexing (V3 xSize ySize zSize) = [(V3 x y z) | x <- [0..xSize-1], y <- [0..ySize-1], z <- [0..zSize-1]]
 
 boundingBox :: Tensor3 a -> (a -> Bool) -> BoundingBox
-boundingBox tensor@(Tensor3 v sz) pr = foldr helper (V3 0 0 0, sz - (V3 1 1 1)) (indexing sz)
+boundingBox tensor@(Tensor3 v sz) pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) (indexing sz)
   where
     helper idx bbox@(closest, farthest)
       | pr (tensor ! idx) = (min <$> idx <*> closest, max <$> idx <*> farthest)
