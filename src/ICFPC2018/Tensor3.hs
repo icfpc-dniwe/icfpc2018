@@ -8,6 +8,7 @@ module ICFPC2018.Tensor3
   , update
   , create
   , replicate
+  , boundingBox
   ) where
 
 import Prelude hiding (replicate)
