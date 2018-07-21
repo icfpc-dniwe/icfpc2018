@@ -56,4 +56,4 @@ packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton
     upIdx = case idx of
       (V3 x y z) -> (V3 x (y + 1) z)
 packIntensions (FlipGravity:xs) model = V.singleton Flip : packIntensions xs model
-packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero)
+packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero) ++ [V.singleton Halt]
