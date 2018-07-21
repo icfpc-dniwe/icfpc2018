@@ -24,7 +24,7 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests"
+tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ testGroup "Tests"
   [ tensor3Tests
   , simulationTests
   , aStarTests
@@ -40,8 +40,7 @@ tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tens
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
-    let getSize' = choose (0, 16)
-    size <- V3 <$> getSize' <*> getSize' <*> getSize'
+    size <- V3 <$> getSize <*> getSize <*> getSize
     values <- vectorOf (product size) arbitrary
     return $ T3.create (V.fromList values) size
 
@@ -121,7 +120,7 @@ simulationTests = testGroup "Simulation Tests" [
 
 newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
 instance Arbitrary EmptySingleBotModel where
-  arbitrary = (choose (0, 16)) >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
+  arbitrary = getSize >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
 
 newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
 instance Arbitrary VolatileCoordinateWrapper where
