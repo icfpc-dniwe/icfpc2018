@@ -28,7 +28,7 @@ tests = testGroup "Tests"
   [ tensor3Tests
   , simulationTests
   , aStarTests
---   , packTests
+  , packTests
   ]
 
 --
@@ -71,16 +71,16 @@ testModel = T3.create
               [ False, False, False
               , False, False, False
               , False, False, False
-                              
+
               , False, True, True
               , False, True, True
               , False, False, False
-                         
+
               , False, True, True
               , False, True, True
               , False, False, False
               ]) (V3 3 3 3)
-  
+
 testScoring :: TestTree
 testScoring = testGroup "Scoring for commands"
   [ HU.testCase "Halt" $ scoreOne Halt @?= 0
@@ -274,17 +274,18 @@ aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start fini
 
 packTests :: TestTree
 packTests = testGroup "Pack Tests" [
-  --   emptyModelPackMoveBFS
+    emptyModelPackMove
   -- , packNonEmptyModelMoveBFS
   ]
 
--- emptyModelPackMoveBFS :: TestTree
--- emptyModelPackMoveBFS = QC.testProperty "emptyModelPackMoveBFS" $ \(
---     EmptySingleBotModel m0
---   , VolatileCoordinateWrapper c
---   , VolatileCoordinateWrapper c'
---   ) -> let
---     m = m0 {botPos = c}
---     simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
---     result = foldl simulateStep' (Right m) (fromMaybe [] $ packMoveBFS m c')
---     in (isRight result) && (fromRight c (botPos <$> result) == c')
+emptyModelPackMove :: TestTree
+emptyModelPackMove = QC.testProperty "emptyModelPackMove" $ \(
+    EmptySingleBotModel m0
+  , VolatileCoordinateWrapper c
+  , VolatileCoordinateWrapper c'
+  ) -> let
+    m = m0 {botPos = c}
+    simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
+    cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) (\x x' -> mlen (x - x')) c c'
+    result = foldl simulateStep' (Right m) cmds
+    in (isRight result) && (fromRight c (botPos <$> result) == c')
