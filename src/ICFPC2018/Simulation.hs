@@ -68,11 +68,14 @@ data SingleBotModel = SingleBotModel
 startModel :: V3 Int -> SingleBotModel
 startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
 
+singleBotCommandsToTrace :: [Command] -> Trace
+singleBotCommandsToTrace cmds = M.fromList <$> zip [botID] <$> (\x -> [x]) <$> cmds where
+  botID = 0
 
 packIntensions :: SingleBotModel -> Intensions -> Trace
 packIntensions m xs = t1 ++ t2 ++ [] where
   (t1, m') = first concat . (flip runState m) . mapM packIntension $ xs
-  t2 = map V.singleton $ (packMove (botPos m') zero) ++ [Halt]
+  t2 = singleBotCommandsToTrace $ (packMove (botPos m') zero) ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
   packIntension = \case
@@ -83,9 +86,9 @@ packIntensions m xs = t1 ++ t2 ++ [] where
       let upIdx      = idx + (V3 0 1 0)
 
       put (SingleBotModel {botPos = upIdx, ..})
-      return (map V.singleton $ packMove botPos upIdx ++ [Fill lowerVoxel])
+      return $ singleBotCommandsToTrace $ packMove botPos upIdx ++ [Fill lowerVoxel]
 
-    FlipGravity -> return $ [V.singleton Flip]
+    FlipGravity -> return $ singleBotCommandsToTrace [Flip]
 
 data MultiBotModel = MultiBotModel
                      { botNum :: !Int

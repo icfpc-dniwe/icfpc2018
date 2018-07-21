@@ -57,6 +57,7 @@ test-suite tests
                      , QuickCheck
                      , ChasingBottoms
                      , linear
+                     , containers
                      , vector
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests

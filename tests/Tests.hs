@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import qualified Data.Vector as V
+import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
@@ -74,7 +75,7 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
     scoreCommand model (FusionS (V3 1 1 1)) == 0,
     scoreCommand model (Fill (V3 2 1 1)) == 12 {-6-},
     scoreCommand model (Fill (V3 0 0 0)) == 12,
-    scoreTrace model (V.fromList <$> [
+    scoreTrace model (M.fromList <$> zip [0, 1] <$> [
       [Wait, LMove (V3 0 2 1) (V3 1 0 0)],
       [Flip, Wait],
       [SMove (V3 0 2 1), Flip],
