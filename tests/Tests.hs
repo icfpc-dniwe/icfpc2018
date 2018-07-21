@@ -15,7 +15,7 @@ import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
-import ICFPC2018.Scoring
+import ICFPC2018.Simulation
 import ICFPC2018.Model
 import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
@@ -36,7 +36,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
 --
 
 tensor3Tests :: TestTree
-tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate, testScoring]
+tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
