@@ -26,7 +26,7 @@ import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Validation
 
-import Debug.Trace
+--import Debug.Trace
 
 data ExecState = ExecState { stateEnergy :: !Int
                            , stateHarmonics :: !HarmonicState
@@ -82,7 +82,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
     SMove lld -> do
       let newPos = myPos + lld
       guard $ validLongDifference lld && T3.inBounds stateMatrix newPos
-      volatiles' <- addVolatiles state (traceShowId volatiles) (S.fromList $ traceShowId $ linearPath myPos lld)
+      volatiles' <- addVolatiles state volatiles (S.fromList $ linearPath myPos lld)
       let newBots = M.insert botIdx (botState { botPos = newPos }) stateBots
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * mlen lld }, volatiles')
     LMove sld1 sld2 -> do

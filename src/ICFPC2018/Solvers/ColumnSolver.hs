@@ -6,12 +6,9 @@ import qualified ICFPC2018.Tensor3 as T3
 
 import Linear.V3 (V3(..))
 import qualified Data.List as L
-import qualified Data.Vector as V
 import qualified Data.Map as M
 import qualified Data.IntSet as IS
 import Control.Monad.State.Strict
-import Control.Arrow (first)
-import Control.Monad.Loops
 
 type NBot = Int
 type LayerID = Int
@@ -38,9 +35,9 @@ grounded :: Model -> VolatileCoordinate -> Bool
 grounded model pos = model T3.! pos
 
 generateBots :: NBot -> BoundingBox -> State ColumnSolverModel ()
-generateBots nbot ((V3 x0 y0 z0), (V3 x1 y1 z1)) = do
-    state@(ColumnSolverModel {..}) <- get
-    put $ state {
+generateBots nbot ((V3 x0 y0 z0), (V3 x1 _ z1)) = do
+    state'@(ColumnSolverModel {..}) <- get
+    put $ state' {
         bots = bots ++ newBots
     }
     where
@@ -56,33 +53,33 @@ fillVoxel task pos voxel = do
     if task T3.! voxel
         then
             do
-                state@(ColumnSolverModel {..}) <- get
-                put $ state { model = T3.update model [(voxel, True)] }
+                state'@(ColumnSolverModel {..}) <- get
+                put $ state' { model = T3.update model [(voxel, True)] }
                 return $ Fill $ voxel - pos
         else
             return $ Wait
 
 fillLayer :: Model -> State ColumnSolverModel Trace
 fillLayer task = do
-    state@ColumnSolverModel {..} <- get
-    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ adjacentVoxels pos) state
+    state'@ColumnSolverModel {..} <- get
+    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ adjacentVoxels pos) state'
         indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
         allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
         in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
 
 fillUnderBot :: Model -> State ColumnSolverModel Trace
 fillUnderBot task = do
-    state@ColumnSolverModel {..} <- get
-    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ [pos + (V3 0 (-1) 0)]) state
+    state'@ColumnSolverModel {..} <- get
+    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ [pos + (V3 0 (-1) 0)]) state'
         indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
         allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
         in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
 
 moveUp :: State ColumnSolverModel Trace
 moveUp = do
-    state@(ColumnSolverModel {..}) <- get
+    state'@(ColumnSolverModel {..}) <- get
     let updBots = map (\(Bot idx (V3 x y z) seeds) -> Bot idx (V3 x (y+1) z) seeds) $ drop 1 bots
-        in put $ state {
+        in put $ state' {
             layer = layer + 1,
             bots = drop 1 bots ++ updBots
         }
@@ -90,32 +87,32 @@ moveUp = do
 
 processLayer :: Model -> State ColumnSolverModel Trace
 processLayer task = do
-    state@(ColumnSolverModel {..}) <- get
+    state'@(ColumnSolverModel {..}) <- get
     let cmdUnder = if layer /= 0
-                        then fst $ runState (fillUnderBot task) state
+                        then fst $ runState (fillUnderBot task) state'
                         else []
-        cmdLayer = fst $ runState (fillLayer task) state
-        cmdMove  = fst $ runState moveUp state
+        cmdLayer = fst $ runState (fillLayer task) state'
+        cmdMove  = fst $ runState moveUp state'
         in return $ cmdUnder ++ cmdLayer ++ cmdMove
 
 defaultColumnSolver :: Model -> Bot -> ColumnSolverModel
 defaultColumnSolver task bot = ColumnSolverModel { bots = [bot], model = T3.replicate (T3.size task) False, layer = 0 }
 
 solveIter' :: Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
-solveIter' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
-    state@(ColumnSolverModel {..}) <- get
+solveIter' _ nbot bbox@(_, (V3 _ by1 _)) = do
+    state'@(ColumnSolverModel {..}) <- get
     if (layer > by1)
         then return []
-        else return $ fst $ runState (solveIter' model nbot bbox) state
+        else return $ fst $ runState (solveIter' model nbot bbox) state'
 
 solve' :: Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
-solve' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
-    state@(ColumnSolverModel {..}) <- get
+solve' _ nbot bbox@((V3 _ by0 _), _) = do
+    state'@(ColumnSolverModel {..}) <- get
     generateBots nbot bbox
-    put $ state {
+    put $ state' {
         layer = by0
     }
-    return $ fst $ runState (solveIter' model nbot bbox) state
+    return $ fst $ runState (solveIter' model nbot bbox) state'
 
 solve :: Model -> BotPos -> NBot -> Trace
 solve task pos nbot =
@@ -123,7 +120,7 @@ solve task pos nbot =
         then fst $ runState (solve' task nbot bbox) $ defaultColumnSolver task $ primaryBot pos nbot
         else error "not implemented!"
     where
-        bbox@((V3 bx0 by0 bz0), (V3 bx1 by1 bz1)) = T3.boundingBox task id
+        bbox@((V3 bx0 _ bz0), (V3 bx1 _ bz1)) = T3.boundingBox task id
         bdx = abs $ bx1 - bx0
         bdz = abs $ bz1 - bz0
         needBots = bdx * bdz `div` 9
