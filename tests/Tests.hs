@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+import Data.Maybe
 import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
+import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
 import Data.Either (isLeft, isRight)
 import Linear.Vector ((*^))
@@ -13,6 +15,7 @@ import ICFPC2018.Types
 import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
+import ICFPC2018.Model
 import ICFPC2018.Simulation
 import qualified ICFPC2018.Tensor3 as T3
 
@@ -20,10 +23,15 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [
-    tensor3Tests
+tests = testGroup "Tests"
+  [ tensor3Tests
   , simulationTests
+  , aStarTests
   ]
+
+--
+-- Tensor3 Tests
+--
 
 tensor3Tests :: TestTree
 tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate, testScoring]
@@ -38,13 +46,15 @@ genI3 :: Tensor3 a -> Gen I3
 genI3 tensor = mapM (\sz -> choose (0, sz - 1)) (T3.size tensor)
 
 tensor3Flip :: TestTree
-tensor3Flip = QC.testProperty "Flip Tensor3 value" $ do
-  tensor <- arbitrary `suchThat` ((/= 0) . product . T3.size)
-  i <- genI3 tensor
-  let value = tensor T3.! i
-      tensor' = T3.update tensor [(i, not value)]
-      value' = tensor' T3.! i
-  return $ value == not value'
+tensor3Flip = QC.testProperty "Flip Tensor3 value" $ forAll testValues testResult
+  where testValues = do
+          tensor <- arbitrary `suchThat` ((/= 0) . product . T3.size)
+          i <- genI3 tensor
+          return (tensor, i)
+        testResult (tensor, i) = value == not value'
+          where value = tensor T3.! i
+                tensor' = T3.update tensor [(i, not value)]
+                value' = tensor' T3.! i
 
 tensor3InvalidIndex :: TestTree
 tensor3InvalidIndex = QC.testProperty "Invalid Tensor3 index" $ \(tensor :: Tensor3 ()) -> isBottom $ tensor T3.! T3.size tensor
@@ -52,41 +62,49 @@ tensor3InvalidIndex = QC.testProperty "Invalid Tensor3 index" $ \(tensor :: Tens
 tensor3InvalidUpdate :: TestTree
 tensor3InvalidUpdate = QC.testProperty "Invalid Tensor3 update" $ \(tensor :: Tensor3 ()) -> isBottom $ T3.update tensor [(T3.size tensor, ())]
 
+testModel :: Model
+testModel = T3.create
+            (V.fromList
+              [ False, False, False
+              , False, False, False
+              , False, False, False
+                              
+              , False, True, True
+              , False, True, True
+              , False, False, False
+                         
+              , False, True, True
+              , False, True, True
+              , False, False, False
+              ]) (V3 3 3 3)
+  
 testScoring :: TestTree
-testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
-  model = T3.create (V.fromList [
-    False, False, False,
-    False, False, False,
-    False, False, False,
+testScoring = testGroup "Scoring for commands"
+  [ HU.testCase "Halt" $ scoreOne Halt @?= 0
+  , HU.testCase "Wait" $ scoreOne Wait @?= 0
+  , HU.testCase "Flip" $ scoreOne Flip @?= 0
+  , HU.testCase "SMove" $ scoreOne (SMove (V3 0 2 1)) @?= 2 * 3
+  , HU.testCase "LMove" $ scoreOne (LMove (V3 0 2 1) (V3 1 0 0)) @?= 2 * (2 + 1 + 2)
+  , HU.testCase "Fission" $ scoreOne (Fission (V3 1 1 1) 1) @?= 24
+  , HU.testCase "FusionP" $ scoreOne (FusionP (V3 1 1 1)) @?= -24
+  , HU.testCase "FusionS" $ scoreOne (FusionS (V3 1 1 1)) @?= 0
+  , HU.testCase "Fill empty" $ scoreOne (Fill (V3 0 0 0)) @?= 12
+  , HU.testCase "Fill again" $ scoreOne (Fill (V3 2 1 1)) @?= 6
+  , HU.testCase "scoreTrace" $ scoreTrace testModel testTrace @?= testTraceScore
+  ]
+  where scoreOne = scoreCommand testModel
+        testTrace = M.fromList <$> zip [0, 1] <$>
+                    [ [Wait, LMove (V3 0 2 1) (V3 1 0 0)]
+                    , [Flip, Wait]
+                    , [SMove (V3 0 2 1), Flip]
+                    , [Fill (V3 2 1 1), Fill (V3 0 0 0)]
+                    , [Halt, Halt]
+                    ]
+        testTraceScore = sum [sum [0, 0, 6, 12 {-6-}, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 3 + 30 + 3 + 3) * 27
 
-    False, True, True,
-    False, True, True,
-    False, False, False,
-
-    False, True, True,
-    False, True, True,
-    False, False, False
-    ]) (V3 3 3 3)
-  cmdTests = [
-    scoreCommand model Halt == 0,
-    scoreCommand model Wait == 0,
-    scoreCommand model Flip == 0,
-    scoreCommand model (SMove (V3 0 2 1)) == 2 * 3,
-    scoreCommand model (LMove (V3 0 2 1) (V3 1 0 0)) == 2 * (2 + 1 + 2),
-    scoreCommand model (Fission (V3 1 1 1) 1) == 24,
-    scoreCommand model (FusionP (V3 1 1 1)) == -24,
-    scoreCommand model (FusionS (V3 1 1 1)) == 0,
-    scoreCommand model (Fill (V3 2 1 1)) == 12 {-6-},
-    scoreCommand model (Fill (V3 0 0 0)) == 12,
-    scoreTrace model (M.fromList <$> zip [0, 1] <$> [
-      [Wait, LMove (V3 0 2 1) (V3 1 0 0)],
-      [Flip, Wait],
-      [SMove (V3 0 2 1), Flip],
-      [Fill (V3 2 1 1), Fill (V3 0 0 0)],
-      [Halt, Halt]
-      ]) == sum [sum [0, 0, 6, 12 {-6-}, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 3 + 30 + 3 + 3) * 27
-    ]
-
+--
+-- Simulation tests
+--
 
 simulationTests :: TestTree
 simulationTests = testGroup "Simulation Tests" [
@@ -203,3 +221,33 @@ simulationLMoveNonVoid = QC.testProperty "LMove: non void" $ \(
       }
     in isBounded m (c+d1) && isBounded m (c+d1+d2) ==>
        isLeft $ simulateStep m' (LMove d1 d2)
+
+--
+-- A* tests
+--
+
+aStarTests :: TestTree
+aStarTests = testGroup "A* Tests" [aStarRandom, aStarGuaranteed]
+
+checkPath :: Model -> I3 -> I3 -> [I3] -> Bool
+checkPath _ _ _ [] = False
+checkPath model start finish path0@(first:_)
+  | first /= start = False
+  | otherwise = go path0
+  where go [] = error "checkPath: impossible"
+        go [current] = current == finish
+        go (current:path@(next:_)) = next `elem` neighbours current model && go path
+
+aStarRandom :: TestTree
+aStarRandom = QC.testProperty "A* Random Models Passable" $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
+  where testPassable model =
+          case aStar start finish model of
+            Nothing -> True
+            Just path -> checkPath model start finish path
+          where start = 0
+                finish = T3.size model - 1
+
+aStarGuaranteed :: TestTree
+aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ aStar start finish testModel) @?= True
+  where start = 0
+        finish = (T3.size testModel - 1)
