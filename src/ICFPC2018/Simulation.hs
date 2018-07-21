@@ -50,10 +50,10 @@ data SingleBotModel = SingleBotModel
                       } deriving (Show, Eq)
 
 packIntensions :: Intensions -> SingleBotModel -> Trace
-packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
+packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [V.singleton $ Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
   where
     lowerVoxel = V3 0 (-1) 0
     upIdx = case idx of
       (V3 x y z) -> (V3 x (y + 1) z)
 packIntensions (FlipGravity:xs) model = V.singleton Flip : packIntensions xs model
-packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero))
+packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero)
