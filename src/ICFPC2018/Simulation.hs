@@ -105,4 +105,4 @@ sliceIntensions :: Intensions -> MS.Map YPlane Intensions
 sliceIntensions intensions = foldr updateHelper MS.empty intensions
   where
     updateHelper FlipGravity m = m
-    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.adjust (++ [intension]) y m
+    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.insertWith (++) y [intension] m
