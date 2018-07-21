@@ -38,7 +38,8 @@ tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tens
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
-    size <- V3 <$> getSize <*> getSize <*> getSize
+    let getSize' = choose (0, 32)
+    size <- V3 <$> getSize' <*> getSize' <*> getSize'
     values <- vectorOf (product size) arbitrary
     return $ T3.create (V.fromList values) size
 
@@ -239,7 +240,7 @@ checkPath model start finish path0@(first:_)
         go (current:path@(next:_)) = next `elem` neighbours current model && go path
 
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* Random Models Passable" $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
+aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
   where testPassable model =
           case aStar start finish model of
             Nothing -> True
