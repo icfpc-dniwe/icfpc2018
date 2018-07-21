@@ -5,8 +5,11 @@ import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.ChasingBottoms
+import Data.Either (isLeft, isRight)
+import Linear.Vector ((*^))
 
 import ICFPC2018.Types
+import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
 import ICFPC2018.Simulation
@@ -83,8 +86,17 @@ testScoring = QC.testProperty "Scoring for commands" $ all id cmdTests where
       ]) == sum [sum [0, 0, 6, 12 {-6-}, 0], sum [10, 0, 0, 12, 0]] + 20 * 2 * 5 + (3 + 3 + 30 + 3 + 3) * 27
     ]
 
+
 simulationTests :: TestTree
-simulationTests = testGroup "Simulation Tests" [simulationSMove]
+simulationTests = testGroup "Simulation Tests" [
+    simulationSMove
+  , simulationSMoveOutOfBounds
+  , simulationSMoveNonVoid
+  ]
+
+newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
+instance Arbitrary EmptySingleBotModel where
+  arbitrary = (max 1 <$> getSize) >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
 
 newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
 instance Arbitrary VolatileCoordinateWrapper where
@@ -92,13 +104,52 @@ instance Arbitrary VolatileCoordinateWrapper where
     [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, s)
     return $ VolatileCoordinateWrapper (V3 x y z)
 
+instance Arbitrary Axis where
+  arbitrary = arbitraryBoundedEnum
+
 newtype LongDifferenceWrapper = LongDifferenceWrapper LongDifference deriving Show
 instance Arbitrary LongDifferenceWrapper where
-  arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitraryBoundedEnum <*> (choose (1, maxLLD)))
+  arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxLLD)))
 
+
+
+isBounded :: SingleBotModel -> VolatileCoordinate -> Bool
+isBounded m r = let
+  (V3 mx my mz) = T3.size $ filledModel m
+  (V3 rx ry rz) = r
+  in (0 < rx && rx < mx) && (0 < ry && ry < my) && (0 < rz && rz < mz)
 
 simulationSMove :: TestTree
 simulationSMove = QC.testProperty "SMove" $ \(
-    VolatileCoordinateWrapper c
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
   , LongDifferenceWrapper d
-  ) -> last (simulateStep c (SMove d)) == c + d
+  ) -> isBounded m (c+d) ==> isRight $ simulateStep m {botPos = c} (SMove d)
+
+simulationSMoveOutOfBounds :: TestTree
+simulationSMoveOutOfBounds = QC.testProperty "SMove: out of bounds" $ \(
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
+  , axis
+  , dir
+  ) -> let
+    l = maximum (T3.size $ filledModel m)
+    d = mkLinearDifference axis ((if dir then 1 else (-1)) * l)
+    in isLeft $ simulateStep m {botPos = c} (SMove d)
+
+simulationSMoveNonVoid :: TestTree
+simulationSMoveNonVoid = QC.testProperty "SMove: non void" $ \(
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
+  , LongDifferenceWrapper d
+  , NonEmpty ps
+  ) -> let
+    l = mlen d + 1
+    n = normalizeLinearDifference d
+    ps' = map (`mod` l) ps
+    updates = zip (map (\i -> c + i*^n) ps') (repeat True)
+    m' = m {
+        botPos = c
+      , filledModel = T3.update (filledModel m) updates
+      }
+    in isBounded m (c+d) ==> isLeft $ simulateStep m' (SMove d)
