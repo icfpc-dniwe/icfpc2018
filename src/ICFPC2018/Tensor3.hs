@@ -59,7 +59,7 @@ instance Foldable Tensor3 where
   foldMap fun (Tensor3 v sz) = foldMap fun v
 
 instance Functor Tensor3 where
-  fmap fun (Tensor3 v sz) = Tensor3 (fun v) sz
+  fmap fun (Tensor3 v sz) = Tensor3 (fun <$> v) sz
 
 instance Traversable Tensor3 where
   traverse fun (Tensor3 v sz) = Tensor3 <$> traverse fun v <*> pure sz
