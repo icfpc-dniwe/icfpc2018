@@ -92,6 +92,9 @@ simulationTests = testGroup "Simulation Tests" [
     simulationSMove
   , simulationSMoveOutOfBounds
   , simulationSMoveNonVoid
+  , simulationLMove
+  , simulationLMoveOutOfBounds
+  , simulationLMoveNonVoid
   ]
 
 newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
@@ -111,6 +114,9 @@ newtype LongDifferenceWrapper = LongDifferenceWrapper LongDifference deriving Sh
 instance Arbitrary LongDifferenceWrapper where
   arbitrary = LongDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxLLD)))
 
+newtype ShortDifferenceWrapper = ShortDifferenceWrapper ShortDifference deriving Show
+instance Arbitrary ShortDifferenceWrapper where
+  arbitrary = ShortDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxSLD)))
 
 
 isBounded :: SingleBotModel -> VolatileCoordinate -> Bool
@@ -153,3 +159,46 @@ simulationSMoveNonVoid = QC.testProperty "SMove: non void" $ \(
       , filledModel = T3.update (filledModel m) updates
       }
     in isBounded m (c+d) ==> isLeft $ simulateStep m' (SMove d)
+
+
+simulationLMove :: TestTree
+simulationLMove = QC.testProperty "LMove" $ \(
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
+  , ShortDifferenceWrapper d1, ShortDifferenceWrapper d2
+  ) -> isBounded m (c+d1) && isBounded m (c+d1+d2) ==> isRight $ simulateStep m {botPos = c} (LMove d1 d2)
+
+
+simulationLMoveOutOfBounds :: TestTree
+simulationLMoveOutOfBounds = QC.testProperty "LMove: out of bounds" $ \(
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
+  , axis
+  , dir
+  ) -> let
+    l = maximum (T3.size $ filledModel m)
+    d = mkLinearDifference axis ((if dir then 1 else (-1)) * l)
+    in isLeft $ simulateStep m {botPos = c} (LMove d (-d))
+
+
+simulationLMoveNonVoid :: TestTree
+simulationLMoveNonVoid = QC.testProperty "LMove: non void" $ \(
+    EmptySingleBotModel m
+  , VolatileCoordinateWrapper c
+  , ShortDifferenceWrapper d1, ShortDifferenceWrapper d2
+  , NonEmpty ps1, NonEmpty ps2
+  ) -> let
+    l1 = mlen d1 + 1
+    l2 = mlen d2 + 1
+    n1 = normalizeLinearDifference d1
+    n2 = normalizeLinearDifference d2
+    ps1' = map (`mod` l1) ps1
+    ps2' = map (`mod` l2) ps2
+    updates1 = zip (map (\i -> c + i*^n1) ps1') (repeat True)
+    updates2 = zip (map (\i -> c + d1 + i*^n2) ps2') (repeat True)
+    m' = m {
+        botPos = c
+      , filledModel = T3.update (filledModel m) (updates1 ++ updates2)
+      }
+    in isBounded m (c+d1) && isBounded m (c+d1+d2) ==>
+       isLeft $ simulateStep m' (LMove d1 d2)
