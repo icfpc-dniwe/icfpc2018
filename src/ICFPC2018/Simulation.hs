@@ -26,10 +26,19 @@ normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
 packMove :: VolatileCoordinate -> VolatileCoordinate -> [Command]
 -- stupid pack using only SMove and not checking collisions
 packMove (V3 xFrom yFrom zFrom) (V3 xTo yTo zTo)
-  | xFrom /= xTo = SMove (mkLinearDifference X (xTo - xFrom)) : packMove (V3 xTo yFrom zFrom) (V3 xTo yTo zTo)
-  | yFrom /= yTo = SMove (mkLinearDifference Y (yTo - yFrom)) : packMove (V3 xFrom yTo zFrom) (V3 xTo yTo zTo)
-  | zFrom /= zTo = SMove (mkLinearDifference Z (zTo - zFrom)) : packMove (V3 xFrom yFrom zTo) (V3 xTo yTo zTo)
+  | xFrom /= xTo = SMove (mkLinearDifference X distX) : packMove (V3 newX yFrom zFrom) (V3 xTo yTo zTo)
+  | yFrom /= yTo = SMove (mkLinearDifference Y distY) : packMove (V3 xFrom newY zFrom) (V3 xTo yTo zTo)
+  | zFrom /= zTo = SMove (mkLinearDifference Z distZ) : packMove (V3 xFrom yFrom newZ) (V3 xTo yTo zTo)
   | otherwise    = []
+    where
+      (distX, newX) = moveTowards xFrom xTo
+      (distY, newY) = moveTowards yFrom yTo
+      (distZ, newZ) = moveTowards zFrom zTo
+
+moveTowards :: Int -> Int -> (Int, Int)
+moveTowards from to | to > from + 15 = (15, from + 15)
+                    | to < from - 15 = (-15, from - 15)
+                    | otherwise      = (to - from, to)
 
 simulateStep
   :: VolatileCoordinate
