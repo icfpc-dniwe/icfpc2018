@@ -19,7 +19,7 @@ import ICFPC2018.Types
 import ICFPC2018.Utils
 
 neighbours :: I3 -> Model -> [I3]
-neighbours p model = filter (checkBounds (T3.size model)) $ map (p +) allNeighbours
+neighbours p model = filter (\i -> checkBounds (T3.size model) i && not (model T3.! i)) $ map (p +) allNeighbours
   where allNeighbours =
           [ V3 (-1) 0    0
           , V3 1    0    0

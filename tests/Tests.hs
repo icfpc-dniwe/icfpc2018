@@ -234,10 +234,10 @@ checkPath :: Model -> I3 -> I3 -> [I3] -> Bool
 checkPath _ _ _ [] = False
 checkPath model start finish path0@(first:_)
   | first /= start = False
-  | otherwise = go path0
+  | otherwise = not (model T3.! start) && go path0
   where go [] = error "checkPath: impossible"
         go [current] = current == finish
-        go (current:path@(next:_)) = next `elem` neighbours current model && go path
+        go (current:path@(next:_)) = next `elem` neighbours current model && not (model T3.! next) && go path
 
 aStarRandom :: TestTree
 aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
