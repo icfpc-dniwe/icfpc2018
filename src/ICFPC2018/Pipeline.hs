@@ -23,3 +23,8 @@ sliceModel m0 numBots = undefined
 
 solve :: Model -> [T3.I3] -> Intensions
 solve idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
+
+mergeTraces :: [Trace] -> Trace
+mergeTraces traces = foldr helper $ zip [1..] traces
+  where
+    helper = undefined
