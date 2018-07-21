@@ -8,6 +8,7 @@ import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
+import ICFPC2018.Model
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import Control.Monad.State.Strict
 import Control.Arrow (first)
@@ -57,6 +58,8 @@ moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
                     | otherwise      = (to - from, to)
 
 
+mlenMetric :: I3 -> I3 -> Int
+mlenMetric x x' = mlen (x - x')
 
 neighbours :: Model -> I3 -> [(I3, Command)]
 neighbours = result where
@@ -131,26 +134,27 @@ singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$>
 packIntensions :: SingleBotModel -> Intensions -> Trace
 packIntensions m xs = t1 ++ t2 where
   (t1, m') = first concat . (flip runState m) . mapM packIntension $ xs
-  t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m') zero) ++ [Halt]
-  -- t2 = singleBotCommandsToTrace 0
-  --      $ (fromMaybe (error "unable to return to zero") (packMoveBFS m' zero))
-  --      ++ [Halt]
+
+  -- t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m') zero) ++ [Halt]
+  t2 = singleBotCommandsToTrace 0
+       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenMetric (botPos m') zero)
+       ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
   packIntension = \case
     FillIdx idx -> do
-      SingleBotModel {..} <- get
+      m  <- get
 
       let lowerVoxel = V3 0 (-1) 0
       let upIdx      = idx + (V3 0 1 0)
-      let m'         = SingleBotModel {botPos = upIdx, ..}
+      let m'         = m {botPos = upIdx}
 
       put m'
 
-      return $ singleBotCommandsToTrace 0 $ packMove botPos upIdx ++ [Fill lowerVoxel]
-      -- return $ singleBotCommandsToTrace 0
-      --   $ (fromMaybe (error "unable to return to zero") (packMoveBFS m' upIdx))
-      --   ++ [Fill lowerVoxel]
+      -- return $ singleBotCommandsToTrace 0 $ packMove botPos upIdx ++ [Fill lowerVoxel]
+      return $ singleBotCommandsToTrace 0
+        $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenMetric (botPos m') upIdx)
+        ++ [Fill lowerVoxel]
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
 
