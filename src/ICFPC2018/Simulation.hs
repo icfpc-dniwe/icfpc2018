@@ -2,6 +2,7 @@ module ICFPC2018.Simulation where
 
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types

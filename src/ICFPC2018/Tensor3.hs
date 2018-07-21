@@ -27,6 +27,11 @@ data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
 linearIdx :: Tensor3Size -> I3 -> Int
 linearIdx (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
 
+tensorIdx :: Int -> Tensor3Size -> I3
+tensorIdx linIdx (V3 xSize ySize zSize) = (V3 x y z) where
+  (x, xrest) = (linIdx `div` (zSize * ySize), linIdx `mod` (zSize * ySize))
+  (y, z) = (xrest `div` zSize, xrest `mod` zSize)
+
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
 checkedLinearIdx sz idx
   | checkBounds sz idx = linearIdx sz idx
@@ -54,3 +59,6 @@ create v sz
 
 replicate :: Tensor3Size -> a -> Tensor3 a
 replicate sz v = Tensor3 (V.replicate (product sz) v) sz
+
+--boundingBoxPred :: Tensor3 a -> (I3 -> Bool) -> I3
+--boundingBox (Tensor3 v sz) pred' = 
