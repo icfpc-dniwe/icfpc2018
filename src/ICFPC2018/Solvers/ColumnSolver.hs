@@ -1,6 +1,5 @@
 module ICFPC2018.Solvers.ColumnSolver where
 
-<<<<<<< HEAD
 import ICFPC2018.Types
 import ICFPC2018.Tensor3 (BoundingBox)
 import qualified ICFPC2018.Tensor3 as T3
@@ -74,15 +73,22 @@ fillLayer task = do
 fillUnderBot :: Model -> State ColumnSolverModel Trace
 fillUnderBot task = do
     ColumnSolverModel {..} <- get
-    return $ M.fromList <$> (L.transpose $ map (\(Bot idx pos _) -> map (\cmd -> (idx, cmd)) $ mapM (fillVoxel task pos) $ [pos + (V3 0 (-1) 0)]) bots)
+    let botCommands pos = fst <$> runState <$> mapM (fillVoxel task pos) $ [pos - (V3 0 (-1) 0)]
+        indexedBotCommands idx pos = mapM (\cmd -> (idx, cmd)) $ botCommands pos
+        allBotCommands = mapM (\(Bot idx pos _) -> indexedBotCommands idx pos)
+        in mapM (M.fromList) $ mapM (L.transpose) $ allBotCommands bots
 
 moveUp :: State ColumnSolverModel Trace
 moveUp = do
     state@(ColumnSolverModel {..}) <- get
-    put $ state { layer = layer + 1 }
-    return $ M.fromList $ map (\(Bot idx (V3 x y z) _) -> (idx, SMove (V3 0 1 0)))
+    updBots <- mapM (\(Bot idx (V3 x y z) seeds) -> Bot idx (V3 x (y+1) z) seeds) bots
+    put $ state {
+        layer = layer + 1,
+        bots = updBots
+        }
+    return $ M.fromList $ map (\(Bot idx _ _) -> (idx, SMove (V3 0 1 0))) bots
 
-processLayer :: Model -> State ColumnSolverModel ()
+processLayer :: Model -> State ColumnSolverModel Trace
 processLayer task = do
     ColumnSolverModel {..} <- get
     when (layer /= 0) $ fillUnderBot task
@@ -92,17 +98,19 @@ processLayer task = do
 defaultColumnSolver :: Model -> Bot -> ColumnSolverModel
 defaultColumnSolver task bot = ColumnSolverModel { bots = [bot], model = T3.replicate (T3.size task) False, layer = 0 }
 
-solve' :: ColumnSolverModel -> Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
+solve' :: Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
 solve' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
-    generateBots nbot bbox
     state@(ColumnSolverModel {..}) <- get
-    put $ state { layer = by0 }
-    return $ map (++) $ whileM (layer <= by1) $ processLayer task
+    generateBots nbot bbox
+    put $ state {
+        layer = by0
+    }
+    return $ map (++) $ iterateWhile (layer <= by1) $ processLayer task
 
 solve :: Model -> BotPos -> NBot -> Trace
 solve task pos nbot =
     if needBots > nbot
-        then runState $ solve' (defaultColumnSolver task $ primaryBot pos nbot) task nbot bbox
+        then runState $ (defaultColumnSolver task $ primaryBot pos nbot) >>= solve' task nbot bbox
         else error "not implemented!"
     where
         bbox@((V3 bx0 by0 bz0), (V3 bx1 by1 bz1)) = T3.boundingBox task id
