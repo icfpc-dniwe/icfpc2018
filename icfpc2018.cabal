@@ -21,6 +21,7 @@ library
                      , ICFPC2018.Solvers.HighSolver
                      , ICFPC2018.Solvers.ColumnSolver
                      , ICFPC2018.Primitives
+                     , ICFPC2018.Pipeline
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.10

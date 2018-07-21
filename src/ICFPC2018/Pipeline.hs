@@ -20,3 +20,6 @@ sliceModel m0 numBots =
                                     else (Z, z2 - z1)
     slice (X, xdiff) = undefined
     slice (Z, zdiff) = undefined
+
+solve :: Model -> [T3.I3] -> Intensions
+solve idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
