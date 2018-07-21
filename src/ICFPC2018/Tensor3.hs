@@ -9,6 +9,7 @@ module ICFPC2018.Tensor3
   , create
   , replicate
   , boundingBox
+  , slice
   ) where
 
 import Prelude hiding (replicate)
@@ -29,7 +30,7 @@ data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
                deriving (Show, Eq)
 
 linearIdx :: Tensor3Size -> I3 -> Int
-linearIdx (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
+linearIdx (V3 _ ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
 
 {-
 tensorIdx :: Int -> Tensor3Size -> I3
@@ -70,8 +71,9 @@ indexing :: Tensor3Size -> [I3]
 indexing (V3 xSize ySize zSize) = [(V3 x y z) | x <- [0..xSize-1], y <- [0..ySize-1], z <- [0..zSize-1]]
 
 boundingBox :: Tensor3 a -> (a -> Bool) -> BoundingBox
-boundingBox tensor@(Tensor3 v sz) pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) (indexing sz)
+boundingBox tensor pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) (indexing sz)
   where
+    sz = size tensor
     helper idx bbox@(closest, farthest)
       | pr (tensor ! idx) = (min <$> idx <*> closest, max <$> idx <*> farthest)
       | otherwise = bbox
@@ -80,7 +82,7 @@ slice :: Tensor3 a -> BoundingBox -> [I3]
 slice tensor ((V3 x0 y0 z0), (V3 x1 y1 z1)) = filter (\(V3 x y z) -> all id [x0 <= x, x1 >= x, y0 <= y, y1 >= y, z0 <= z, z1 >= z]) $ indexing $ size tensor
 
 instance Foldable Tensor3 where
-  foldMap fun (Tensor3 v sz) = foldMap fun v
+  foldMap fun (Tensor3 v _) = foldMap fun v
 
 instance Functor Tensor3 where
   fmap fun (Tensor3 v sz) = Tensor3 (fun <$> v) sz
