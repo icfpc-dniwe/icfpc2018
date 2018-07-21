@@ -19,7 +19,5 @@ main = do
       trace = packIntensions (SingleBotModel (V3 0 0 0) model) (solver model)
       score = scoreTrace model trace
       traceData = runPut $ putTrace trace
-  print trace
-  print score
   unless (validTrace trace) $ fail "Invalid trace"
   BL.writeFile tracePath traceData
