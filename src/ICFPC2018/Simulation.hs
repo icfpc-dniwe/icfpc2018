@@ -13,6 +13,12 @@ import Control.Arrow (first)
 import qualified Data.Map.Strict as MS
 
 
+data SingleBotModel = SingleBotModel {
+    botPos      :: !VolatileCoordinate
+  , filledModel :: !Model
+  } deriving (Show, Eq)
+
+
 zero :: VolatileCoordinate
 zero = V3 0 0 0
 
@@ -45,25 +51,44 @@ moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
                     | to < from - maxLLD = (-maxLLD, from - maxLLD)
                     | otherwise      = (to - from, to)
 
-simulateStep
-  :: VolatileCoordinate
-  -- ^ We suppose that this coordinate is already in list of bot's trace
-  -- ^ Probably there should be a system state
-  -> Command
-  -> [VolatileCoordinate]
-simulateStep c = \case
-  SMove d -> let
-    nd = normalizeLinearDifference d
-    ld = mlen d
-    in map (\i -> c + i*^nd) [1..ld]
 
-  LMove d1 d2 -> error "TODO: simulateStep LMove"
-  cmd         -> error $ "TODO: simulateStep " ++ (show cmd)
+simulateStep :: SingleBotModel -> Command -> Either String SingleBotModel
+simulateStep = simulateStep' where
 
-data SingleBotModel = SingleBotModel
-                      { botPos :: !VolatileCoordinate
-                      , filledModel :: !Model
-                      } deriving (Show, Eq)
+  simulateStep' m = \case
+    SMove d -> let
+      c  = botPos m
+      c' = c + d
+      in do
+        checkBounds m c' >> checkVoidPath m c c'
+        Right $ m {botPos = c'}
+
+    LMove d1 d2 -> let
+      c   = botPos m
+      c'  = c  + d1
+      c'' = c' + d2
+      in do
+        checkBounds m c'  >> checkVoidPath m c c'
+        checkBounds m c'' >> checkVoidPath m c' c''
+        Right $ m {botPos = c''}
+
+    cmd -> error $ "TODO: simulateStep " ++ (show cmd)
+
+  checkBounds :: SingleBotModel -> VolatileCoordinate -> Either String ()
+  checkBounds m c = let
+    (V3 mx my mz) = T3.size . filledModel $ m
+    (V3 cx cy cz) = c
+    in when (not $ 0 < cx && cx < mx && 0 < cy && cy < my && 0 < cz && cz < mz)
+       $ Left $ "out of bounds: " ++ show c
+
+  checkVoidPath :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Either String ()
+  checkVoidPath m c c' = let
+    d = c' - c
+    n = normalizeLinearDifference d
+    l = mlen d
+    in when (any (\i -> (filledModel m) T3.! (c + i*^n)) [0..l])
+       $ Left $ "non void voxels between" ++ show c ++ " and " ++ show c'
+
 
 startModel :: V3 Int -> SingleBotModel
 startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
@@ -108,4 +133,4 @@ sliceIntensions :: Intensions -> MS.Map YPlane Intensions
 sliceIntensions intensions = foldr updateHelper MS.empty intensions
   where
     updateHelper FlipGravity m = m
-    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.adjust (++ [intension]) y m
+    updateHelper intension@(FillIdx (V3 _ y _)) m = MS.insertWith (++) y [intension] m
