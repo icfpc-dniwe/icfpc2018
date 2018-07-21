@@ -13,14 +13,15 @@ library
   exposed-modules:     ICFPC2018.Types
                      , ICFPC2018.Utils
                      , ICFPC2018.Tensor3
-                     , ICFPC2018.Scoring
-                     , ICFPC2018.Simulation
+                     , ICFPC2018.Pack
                      , ICFPC2018.IO
                      , ICFPC2018.Model
                      , ICFPC2018.Validation
                      , ICFPC2018.Solvers.HighSolver
   --                   , ICFPC2018.Solvers.ColumnSolver
                      , ICFPC2018.Primitives
+                     , ICFPC2018.Simulation
+                     -- , ICFPC2018.Pipeline
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.10
@@ -37,6 +38,7 @@ library
   default-extensions:  BinaryLiterals
                      , LambdaCase
                      , RecordWildCards
+                     , ScopedTypeVariables
   ghc-options:         -Wall
 
 executable solver
@@ -58,11 +60,13 @@ test-suite tests
                      , tasty-quickcheck
                      , tasty-hunit
                      , ChasingBottoms
-                     , linear
-                     , containers
                      , vector
+                     , containers
+                     , linear
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   default-language:    Haskell2010
   default-extensions:  ScopedTypeVariables
+                     , LambdaCase
+                     , RecordWildCards
   ghc-options:         -Wall

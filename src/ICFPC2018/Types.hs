@@ -1,6 +1,5 @@
 module ICFPC2018.Types where
 
-import Data.Vector (Vector)
 import Data.Map (Map)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS

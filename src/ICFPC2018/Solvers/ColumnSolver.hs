@@ -1,5 +1,6 @@
 module ICFPC2018.Solvers.ColumnSolver where
 
+<<<<<<< HEAD
 import ICFPC2018.Types
 import ICFPC2018.Tensor3 (BoundingBox)
 import qualified ICFPC2018.Tensor3 as T3

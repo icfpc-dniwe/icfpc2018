@@ -8,25 +8,27 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
-import Data.Either (isLeft, isRight)
+import Data.Either (isLeft, isRight, fromRight)
+import Data.Maybe (fromMaybe)
 import Linear.Vector ((*^))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
-import ICFPC2018.Scoring
-import ICFPC2018.Model
 import ICFPC2018.Simulation
+import ICFPC2018.Model
+import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests"
+tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ testGroup "Tests"
   [ tensor3Tests
   , simulationTests
   , aStarTests
+  , packTests
   ]
 
 --
@@ -34,7 +36,7 @@ tests = testGroup "Tests"
 --
 
 tensor3Tests :: TestTree
-tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate, testScoring]
+tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
@@ -68,16 +70,16 @@ testModel = T3.create
               [ False, False, False
               , False, False, False
               , False, False, False
-                              
+
               , False, True, True
               , False, True, True
               , False, False, False
-                         
+
               , False, True, True
               , False, True, True
               , False, False, False
               ]) (V3 3 3 3)
-  
+
 testScoring :: TestTree
 testScoring = testGroup "Scoring for commands"
   [ HU.testCase "Halt" $ scoreOne Halt @?= 0
@@ -118,12 +120,20 @@ simulationTests = testGroup "Simulation Tests" [
 
 newtype EmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
 instance Arbitrary EmptySingleBotModel where
-  arbitrary = (max 1 <$> getSize) >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
+  arbitrary = getSize >>= \s -> return $ EmptySingleBotModel (startModel (V3 s s s))
+
+-- TODO
+-- newtype NonEmptySingleBotModel = EmptySingleBotModel SingleBotModel deriving Show
+-- instance Arbitrary EmptySingleBotModel where
+--   arbitrary = do
+--     n <- getSize
+--     return $ NonEmptySingleBotModel (startModel (V3 (max 1 n) (max 1 n) (max 1 n)))
+
 
 newtype VolatileCoordinateWrapper = VolatileCoordinateWrapper VolatileCoordinate deriving Show
 instance Arbitrary VolatileCoordinateWrapper where
   arbitrary = do
-    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, s)
+    [x, y, z] <- getSize >>= \s -> sequence . replicate 3 $ choose (0, max 0 (s - 1))
     return $ VolatileCoordinateWrapper (V3 x y z)
 
 instance Arbitrary Axis where
@@ -137,12 +147,11 @@ newtype ShortDifferenceWrapper = ShortDifferenceWrapper ShortDifference deriving
 instance Arbitrary ShortDifferenceWrapper where
   arbitrary = ShortDifferenceWrapper <$> (mkLinearDifference <$> arbitrary <*> (choose (1, maxSLD)))
 
-
 isBounded :: SingleBotModel -> VolatileCoordinate -> Bool
 isBounded m r = let
   (V3 mx my mz) = T3.size $ filledModel m
   (V3 rx ry rz) = r
-  in (0 < rx && rx < mx) && (0 < ry && ry < my) && (0 < rz && rz < mz)
+  in (0 <= rx && rx < mx) && (0 <= ry && ry < my) && (0 <= rz && rz < mz)
 
 simulationSMove :: TestTree
 simulationSMove = QC.testProperty "SMove" $ \(
@@ -226,28 +235,75 @@ simulationLMoveNonVoid = QC.testProperty "LMove: non void" $ \(
 -- A* tests
 --
 
+immediateNeighbours :: Model -> I3 -> [(I3, I3)]
+immediateNeighbours model p = filter (\(i, _) -> checkBounds (T3.size model) i && not (model T3.! i)) $ map (\step -> (p + step, step)) allNeighbours
+  where allNeighbours =
+          [ V3 (-1) 0    0
+          , V3 1    0    0
+          , V3 0    (-1) 0
+          , V3 0    1    0
+          , V3 0    0    (-1)
+          , V3 0    0    1
+          ]
+
+immediateAStar :: Model -> I3 -> I3 -> Maybe [(I3, I3)]
+immediateAStar model = aStar (immediateNeighbours model) (\a b -> mlen (a - b))
+
+checkPath :: Model -> I3 -> I3 -> [(I3, I3)] -> Bool
+checkPath _ _ _ [] = False
+checkPath model start finish path0@((first, _):_)
+  | first /= start = False
+  | otherwise = not (model T3.! start) && go path0
+  where go [] = error "checkPath: impossible"
+        go [(current, step)] = current + step == finish
+        go ((current, step):path@((next, _):_)) = isNeighbour && not obstructed && followsSteps && go path
+          where isNeighbour = next `elem` map fst (immediateNeighbours model current)
+                obstructed = model T3.! next
+                followsSteps = current + step == next
+
 aStarTests :: TestTree
 aStarTests = testGroup "A* Tests" [aStarRandom, aStarGuaranteed]
 
-checkPath :: Model -> I3 -> I3 -> [I3] -> Bool
-checkPath _ _ _ [] = False
-checkPath model start finish path0@(first:_)
-  | first /= start = False
-  | otherwise = go path0
-  where go [] = error "checkPath: impossible"
-        go [current] = current == finish
-        go (current:path@(next:_)) = next `elem` neighbours current model && go path
-
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* Random Models Passable" $ forAll (arbitrary `suchThat` ((/= 0) . product . T3.size)) testPassable
-  where testPassable model =
-          case aStar start finish model of
+aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` suitableModel) testPassable
+  where suitableModel model = product (T3.size model) /= 0 && not (model T3.! start)
+        start = 0
+        testPassable model =
+          case immediateAStar model start finish of
             Nothing -> True
             Just path -> checkPath model start finish path
-          where start = 0
-                finish = T3.size model - 1
+          where finish = T3.size model - 1
 
 aStarGuaranteed :: TestTree
-aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ aStar start finish testModel) @?= True
+aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ immediateAStar testModel start finish) @?= True
   where start = 0
         finish = (T3.size testModel - 1)
+
+packTests :: TestTree
+packTests = testGroup "Pack Tests" [
+    emptyModelPackMove
+--   , nonEmptyModelPackMove
+  ]
+
+
+testPackMove :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Bool
+testPackMove m0 c c' = (isRight result) && (fromRight c (botPos <$> result) == c') where
+  m = m0 {botPos = c}
+  simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
+  cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) mlenMetric c c'
+  result = foldl simulateStep' (Right m) cmds
+
+emptyModelPackMove :: TestTree
+emptyModelPackMove = QC.testProperty "emptyModelPackMove" $ within (2 * 10^(6::Int)) $ \(
+    EmptySingleBotModel m0
+  , VolatileCoordinateWrapper c
+  , VolatileCoordinateWrapper c'
+  ) -> testPackMove m0 c c'
+
+
+-- nonEmptyModelPackMove :: TestTree
+-- nonEmptyModelPackMove = QC.testProperty "nonEmptyModelPackMove" $ \(
+--     NonEmptySingleBotModel m0
+--   , VolatileCoordinateWrapper c
+--   , VolatileCoordinateWrapper c'
+--   ) -> testPackMove m0 c c'
