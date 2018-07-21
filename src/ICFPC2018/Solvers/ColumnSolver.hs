@@ -64,11 +64,11 @@ fillVoxel task pos voxel = do
 
 fillLayer :: Model -> State ColumnSolverModel Trace
 fillLayer task = do
-    ColumnSolverModel {..} <- get
-    let botCommands pos = fst <$> runState <$> mapM (fillVoxel task pos) $ adjacentVoxels pos
-        indexedBotCommands idx pos = mapM (\cmd -> (idx, cmd)) $ botCommands pos
-        allBotCommands = mapM (\(Bot idx pos _) -> indexedBotCommands idx pos)
-        in mapM (M.fromList) $ mapM (L.transpose) $ allBotCommands bots
+    state@ColumnSolverModel {..} <- get
+    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) (adjacentVoxels pos)) state
+        indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
+        allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
+        in return $ M.fromList <$> (L.transpose (allBotCommands bots))
 
 fillUnderBot :: Model -> State ColumnSolverModel Trace
 fillUnderBot task = do
