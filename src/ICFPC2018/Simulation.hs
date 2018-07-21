@@ -7,6 +7,8 @@ import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
 
+zero = V3 0 0 0
+
 mkLinearDifference :: Axis -> Int -> Difference
 mkLinearDifference X v = V3 v 0 0
 mkLinearDifference Y v = V3 0 v 0
@@ -48,9 +50,10 @@ data SingleBotModel = SingleBotModel
                       } deriving (Show, Eq)
 
 packIntensions :: Intensions -> SingleBotModel -> Trace
-packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
+packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
   where
+    lowerVoxel = V3 0 (-1) 0
     upIdx = case idx of
       (V3 x y z) -> (V3 x (y + 1) z)
 packIntensions (FlipGravity:xs) model = V.singleton Flip : packIntensions xs model
-packintensions [] _ = []
+packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero))
