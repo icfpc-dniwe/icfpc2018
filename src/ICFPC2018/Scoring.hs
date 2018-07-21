@@ -22,6 +22,7 @@ scoreCommand m (Fill nd) = if m ! nd then 6 else 12
 scoreCommand _ (FusionP _) = -24
 scoreCommand _ (FusionS _) = 0
 
+-- TODO: make data HarmonicState = Low | High instead of Bool
 stepFlipsHarmonic :: Step -> Bool
 stepFlipsHarmonic s = (len `mod` 2) /= 0 where
     len = length $ filter (
@@ -41,7 +42,7 @@ scoreTrace' harmonicState model r (h:t) = trace ("h: " ++ show h ++ " harm: " ++
     stepScore = scoreStep model h
     totalStepScore = fst stepScore
     flipHarmonic = snd stepScore
-    newHarmonicState = if flipHarmonic then not harmonicState else harmonicState 
+    newHarmonicState = if flipHarmonic then not harmonicState else harmonicState
     globalCost = harmonicCost * r ^ (3 :: Int)
     harmonicCost = if newHarmonicState then 30 else 3
 
