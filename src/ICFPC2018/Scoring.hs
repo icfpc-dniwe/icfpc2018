@@ -5,6 +5,7 @@ module ICFPC2018.Scoring
   ) where
 
 import qualified Data.Vector as V
+import qualified Data.Map as M
 import Linear.V3 (V3(..))
 
 import ICFPC2018.Types
@@ -31,12 +32,12 @@ stepFlipsHarmonic s = (len `mod` 2) /= 0 where
         \b -> case b of
             Flip -> True
             _    -> False
-        ) $ V.toList s
+        ) $ M.elems s
 
 scoreStep :: Model -> Step -> (Score, Bool) {-(Score, HarmonicFlip)-}
 scoreStep m s = (score, stepFlipsHarmonic s) where
-    score = localCost + (sum $ (scoreCommand m) <$> s)
-    localCost = 20 * length s
+    score = localCost + (sum $ (scoreCommand m) <$> M.elems s)
+    localCost = 20 * M.size s
 
 scoreTrace' :: HarmonicState -> Model -> Trace -> Score
 scoreTrace' _ _ [] = 0

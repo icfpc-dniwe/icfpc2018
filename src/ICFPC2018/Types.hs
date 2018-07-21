@@ -1,14 +1,24 @@
 module ICFPC2018.Types where
 
 import Data.Vector (Vector)
+import Data.Map (Map)
 import Data.IntSet (IntSet)
+import qualified Data.IntSet as IS
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import Linear.V3 (V3(..))
 
 type Model = Tensor3 Bool
 
+-- each bot has a pool of seed indices
+-- when performing a fission, it gives a subrange of indices to another bot
+-- when perfroming a fusion, it takes back the bot id and its unused pool
 type BotIdx = Int
-type BotSet = IntSet
+type BotSeeds = IntSet
+data Bot = Bot !BotIdx !BotSeeds
+
+primaryBot :: Int {-N seeeds-} -> Bot
+primaryBot n = Bot 0 $ IS.fromList $ [1..n]
+
 type VolatileCoordinate = V3 Int
 type Difference = V3 Int
 type ShortDifference = Difference
@@ -34,7 +44,7 @@ data Command
   | FusionP !NearDifference
   | FusionS !NearDifference
   deriving (Show, Eq)
-type Step = Vector Command -- indexed by bot number
+type Step = Map BotIdx Command
 type Trace = [Step]
 type Score = Int
 

@@ -74,4 +74,4 @@ putCommand (FusionS nd) = putWord8 byte
         byte = 0b110 .|. (end `shiftL` 3)
 
 putTrace :: Trace -> Put
-putTrace = mapM_ (mapM_ putCommand)
+putTrace = mapM_ (mapM_ putCommand . map snd . M.toAscList)
