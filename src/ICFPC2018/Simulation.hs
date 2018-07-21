@@ -6,7 +6,9 @@ import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
+import qualified ICFPC2018.Tensor3 as T3
 
+zero :: VolatileCoordinate
 zero = V3 0 0 0
 
 mkLinearDifference :: Axis -> Int -> Difference
@@ -45,9 +47,12 @@ simulateStep c = \case
   cmd         -> error $ "TODO: simulateStep " ++ (show cmd)
 
 data SingleBotModel = SingleBotModel
-                      { botPos :: !(V3 Int)
+                      { botPos :: !VolatileCoordinate
                       , filledModel :: !Model
                       } deriving (Show, Eq)
+
+startModel :: V3 Int -> SingleBotModel
+startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
 
 packIntensions :: Intensions -> SingleBotModel -> Trace
 packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [V.singleton $ Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})

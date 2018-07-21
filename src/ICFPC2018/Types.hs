@@ -15,6 +15,12 @@ type ShortDifference = Difference
 type LongDifference  = Difference
 type NearDifference  = Difference
 
+data HarmonicState = Low | High deriving (Show, Eq)
+
+changeHarmonic :: HarmonicState -> HarmonicState
+changeHarmonic Low = High
+changeHarmonic High = Low
+
 data Command
   -- Single commands
   = Halt
@@ -35,6 +41,7 @@ type Score = Int
 data Intension
   = FlipGravity
   | FillIdx I3
+  deriving (Show, Eq)
 type Intensions = [Intension]
 
 data Axis = X | Y | Z deriving (Show, Eq, Enum, Bounded)
