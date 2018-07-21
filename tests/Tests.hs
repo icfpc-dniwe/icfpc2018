@@ -274,17 +274,17 @@ aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start fini
 
 packTests :: TestTree
 packTests = testGroup "Pack Tests" [
-    emptyModelPackMoveBFS
+  --   emptyModelPackMoveBFS
   -- , packNonEmptyModelMoveBFS
   ]
 
-emptyModelPackMoveBFS :: TestTree
-emptyModelPackMoveBFS = QC.testProperty "emptyModelPackMoveBFS" $ \(
-    EmptySingleBotModel m0
-  , VolatileCoordinateWrapper c
-  , VolatileCoordinateWrapper c'
-  ) -> let
-    m = m0 {botPos = c}
-    simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
-    result = foldl simulateStep' (Right m) (fromMaybe [] $ packMoveBFS m c')
-    in (isRight result) && (fromRight c (botPos <$> result) == c')
+-- emptyModelPackMoveBFS :: TestTree
+-- emptyModelPackMoveBFS = QC.testProperty "emptyModelPackMoveBFS" $ \(
+--     EmptySingleBotModel m0
+--   , VolatileCoordinateWrapper c
+--   , VolatileCoordinateWrapper c'
+--   ) -> let
+--     m = m0 {botPos = c}
+--     simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
+--     result = foldl simulateStep' (Right m) (fromMaybe [] $ packMoveBFS m c')
+--     in (isRight result) && (fromRight c (botPos <$> result) == c')
