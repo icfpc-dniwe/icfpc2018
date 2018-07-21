@@ -36,8 +36,8 @@ packMove (V3 xFrom yFrom zFrom) (V3 xTo yTo zTo)
       (distZ, newZ) = moveTowards zFrom zTo
 
 moveTowards :: Int -> Int -> (Int, Int)
-moveTowards from to | to > from + 15 = (15, from + 15)
-                    | to < from - 15 = (-15, from - 15)
+moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
+                    | to < from - maxLLD = (-maxLLD, from - maxLLD)
                     | otherwise      = (to - from, to)
 
 simulateStep
