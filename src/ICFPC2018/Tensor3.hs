@@ -21,6 +21,9 @@ import ICFPC2018.Utils
 type Tensor3Size = V3 Int
 type I3 = V3 Int
 
+-- first index in the closest (x y z), second index is included in bounding box
+type BoundingBox = (I3, I3)
+
 data Tensor3 a = Tensor3 !(Vector a) !Tensor3Size
                deriving (Show, Eq)
 
@@ -54,6 +57,16 @@ create v sz
 
 replicate :: Tensor3Size -> a -> Tensor3 a
 replicate sz v = Tensor3 (V.replicate (product sz) v) sz
+
+indexing :: Tensor3Size -> [I3]
+indexing (V3 xSize ySize zSize) = [(V3 x y z) | x <- [0..xSize-1], y <- [0..ySize-1], z <- [0..zSize-1]]
+
+boundingBox :: Tensor3 a -> (a -> Bool) -> BoundingBox
+boundingBox tensor@(Tensor3 v sz) pr = foldr helper (V3 0 0 0, sz - (V3 1 1 1)) (indexing sz)
+  where
+    helper idx bbox@(closest, farthest)
+      | pr (tensor ! idx) = (min <$> idx <*> closest, max <$> idx <*> farthest)
+      | otherwise = bbox
 
 instance Foldable Tensor3 where
   foldMap fun (Tensor3 v sz) = foldMap fun v

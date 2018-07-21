@@ -81,3 +81,18 @@ packIntensions m0 = concat . (flip evalState m0) . mapM packIntension where
       return (map V.singleton $ packMove botPos upIdx ++ [Fill lowerVoxel])
 
     FlipGravity -> return $ [V.singleton Flip]
+
+data MultiBotModel = MultiBotModel
+                     { botNum :: !Int
+                     , allBotPos :: ![VolatileCoordinate]
+                     , filledModelMulti :: !Model
+                     } deriving (Show, Eq)
+
+startMultiModel :: V3 Int -> MultiBotModel
+startMultiModel sz = MultiBotModel {botNum = 1, allBotPos = [V3 0 0 0], filledModelMulti = T3.replicate sz False}
+
+packMultiBot :: MultiBotModel -> Intensions -> Trace
+packMultiBot m0 intensions = undefined
+
+sliceIntensions :: Intensions -> [Intensions]
+sliceIntensions = undefined
