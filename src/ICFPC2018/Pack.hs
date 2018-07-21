@@ -1,4 +1,4 @@
-module ICFPC2018.Simulation where
+module ICFPC2018.Pack where
 
 import Data.Vector (Vector)
 import Data.Maybe (fromMaybe)

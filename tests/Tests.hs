@@ -17,7 +17,7 @@ import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Scoring
 import ICFPC2018.Model
-import ICFPC2018.Simulation
+import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
