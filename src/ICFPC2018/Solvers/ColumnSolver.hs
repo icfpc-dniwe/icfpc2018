@@ -65,38 +65,48 @@ fillVoxel task pos voxel = do
 fillLayer :: Model -> State ColumnSolverModel Trace
 fillLayer task = do
     state@ColumnSolverModel {..} <- get
-    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) (adjacentVoxels pos)) state
+    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ adjacentVoxels pos) state
         indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
         allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
-        in return $ M.fromList <$> (L.transpose (allBotCommands bots))
+        in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
 
 fillUnderBot :: Model -> State ColumnSolverModel Trace
 fillUnderBot task = do
-    ColumnSolverModel {..} <- get
-    let botCommands pos = fst <$> runState <$> mapM (fillVoxel task pos) $ [pos - (V3 0 (-1) 0)]
-        indexedBotCommands idx pos = mapM (\cmd -> (idx, cmd)) $ botCommands pos
-        allBotCommands = mapM (\(Bot idx pos _) -> indexedBotCommands idx pos)
-        in mapM (M.fromList) $ mapM (L.transpose) $ allBotCommands bots
+    state@ColumnSolverModel {..} <- get
+    let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ [pos + (V3 0 (-1) 0)]) state
+        indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
+        allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
+        in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
 
 moveUp :: State ColumnSolverModel Trace
 moveUp = do
     state@(ColumnSolverModel {..}) <- get
-    updBots <- mapM (\(Bot idx (V3 x y z) seeds) -> Bot idx (V3 x (y+1) z) seeds) bots
-    put $ state {
-        layer = layer + 1,
-        bots = updBots
+    let updBots = map (\(Bot idx (V3 x y z) seeds) -> Bot idx (V3 x (y+1) z) seeds) $ drop 1 bots
+        in put $ state {
+            layer = layer + 1,
+            bots = drop 1 bots ++ updBots
         }
-    return $ M.fromList $ map (\(Bot idx _ _) -> (idx, SMove (V3 0 1 0))) bots
+    return [M.fromList (map (\(Bot idx _ _) -> (idx, SMove (V3 0 1 0))) bots)]
 
 processLayer :: Model -> State ColumnSolverModel Trace
 processLayer task = do
-    ColumnSolverModel {..} <- get
-    when (layer /= 0) $ fillUnderBot task
-    fillLayer task
-    moveUp
+    state@(ColumnSolverModel {..}) <- get
+    let cmdUnder = if layer /= 0
+                        then fst $ runState (fillUnderBot task) state
+                        else []
+        cmdLayer = fst $ runState (fillLayer task) state
+        cmdMove  = fst $ runState moveUp state
+        in return $ cmdUnder ++ cmdLayer ++ cmdMove
 
 defaultColumnSolver :: Model -> Bot -> ColumnSolverModel
 defaultColumnSolver task bot = ColumnSolverModel { bots = [bot], model = T3.replicate (T3.size task) False, layer = 0 }
+
+solveIter' :: Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
+solveIter' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
+    state@(ColumnSolverModel {..}) <- get
+    if (layer > by1)
+        then return []
+        else return $ fst $ runState (solveIter' model nbot bbox) state
 
 solve' :: Model -> NBot -> BoundingBox -> State ColumnSolverModel Trace
 solve' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
@@ -105,12 +115,12 @@ solve' task nbot bbox@((V3 _ by0 _), (V3 _ by1 _)) = do
     put $ state {
         layer = by0
     }
-    return $ map (++) $ iterateWhile (layer <= by1) $ processLayer task
+    return $ fst $ runState (solveIter' model nbot bbox) state
 
 solve :: Model -> BotPos -> NBot -> Trace
 solve task pos nbot =
     if needBots > nbot
-        then runState $ (defaultColumnSolver task $ primaryBot pos nbot) >>= solve' task nbot bbox
+        then fst $ runState (solve' task nbot bbox) $ defaultColumnSolver task $ primaryBot pos nbot
         else error "not implemented!"
     where
         bbox@((V3 bx0 by0 bz0), (V3 bx1 by1 bz1)) = T3.boundingBox task id
