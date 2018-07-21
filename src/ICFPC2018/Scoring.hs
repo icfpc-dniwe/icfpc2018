@@ -38,7 +38,7 @@ scoreStep m s = (score, stepFlipsHarmonic s) where
 
 scoreTrace' :: HarmonicState -> Model -> Trace -> Score
 scoreTrace' _ _ [] = 0
-scoreTrace' harmonicState model (h:t) = trace ("h: " ++ show h ++ " harm: " ++ show newHarmonicState ++ " gs: " ++ show globalCost ++ " ts: " ++ show totalStepScore) $ globalCost + totalStepScore + scoreTrace' newHarmonicState model t where
+scoreTrace' harmonicState model (h:t) = trace ("h: " ++ show h ++ " harm: " ++ show newHarmonicState ++ " gs: " ++ show globalCost ++ " ts: " ++ show totalStepScore) $ globalCost + totalStepScore + scoreTrace' harmonicState model t where
     V3 r _ _ = T3.size model
     stepScore = scoreStep model h
     totalStepScore = fst stepScore
