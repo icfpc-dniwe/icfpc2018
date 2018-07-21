@@ -20,6 +20,7 @@ library
                      , ICFPC2018.Validation
                      , ICFPC2018.Solvers.HighSolver
                      , ICFPC2018.Solvers.ColumnSolver
+                     , ICFPC2018.Primitives
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.10
