@@ -8,6 +8,8 @@ import Linear.Vector ((*^))
 import ICFPC2018.Types
 import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
+import Control.Monad.State.Strict
+
 
 zero :: VolatileCoordinate
 zero = V3 0 0 0
@@ -64,11 +66,19 @@ data SingleBotModel = SingleBotModel
 startModel :: V3 Int -> SingleBotModel
 startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
 
-packIntensions :: Intensions -> SingleBotModel -> Trace
-packIntensions ((FillIdx idx):xs) (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos upIdx) ++ [V.singleton $ Fill lowerVoxel] ++ packIntensions xs (SingleBotModel {botPos = upIdx, ..})
-  where
-    lowerVoxel = V3 0 (-1) 0
-    upIdx = case idx of
-      (V3 x y z) -> (V3 x (y + 1) z)
-packIntensions (FlipGravity:xs) model = V.singleton Flip : packIntensions xs model
-packIntensions [] (SingleBotModel {..}) = map (\c -> V.singleton c) (packMove botPos zero) ++ [V.singleton Halt]
+
+packIntensions :: SingleBotModel -> Intensions -> Trace
+packIntensions m0 = concat . (flip evalState m0) . mapM packIntension where
+
+  packIntension :: Intension -> State SingleBotModel Trace
+  packIntension = \case
+    FillIdx idx -> do
+      SingleBotModel {..} <- get
+
+      let lowerVoxel = V3 0 (-1) 0
+      let upIdx      = idx + (V3 0 1 0)
+
+      put (SingleBotModel {botPos = upIdx, ..})
+      return (map V.singleton $ packMove botPos upIdx ++ [Fill lowerVoxel])
+
+    FlipGravity -> return $ [V.singleton Flip]

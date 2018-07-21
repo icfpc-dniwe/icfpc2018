@@ -16,7 +16,7 @@ main = do
   [modelPath, tracePath] <- getArgs
   modelData <- BL.readFile modelPath
   let model = runGet getModel modelData
-      trace = packIntensions (solver model) (SingleBotModel (V3 0 0 0) model)
+      trace = packIntensions (SingleBotModel (V3 0 0 0) model) (solver model)
       score = scoreTrace model trace
       traceData = runPut $ putTrace trace
   print trace

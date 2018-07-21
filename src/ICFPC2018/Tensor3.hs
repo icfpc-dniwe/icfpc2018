@@ -60,5 +60,11 @@ create v sz
 replicate :: Tensor3Size -> a -> Tensor3 a
 replicate sz v = Tensor3 (V.replicate (product sz) v) sz
 
---boundingBoxPred :: Tensor3 a -> (I3 -> Bool) -> I3
---boundingBox (Tensor3 v sz) pred' = 
+instance Foldable Tensor3 where
+  foldMap fun (Tensor3 v sz) = foldMap fun v
+
+instance Functor Tensor3 where
+  fmap fun (Tensor3 v sz) = Tensor3 (fun <$> v) sz
+
+instance Traversable Tensor3 where
+  traverse fun (Tensor3 v sz) = Tensor3 <$> traverse fun v <*> pure sz
