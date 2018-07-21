@@ -44,3 +44,12 @@ x2Line = Primitive
              nullTensor = T3.replicate (V3 2 3 3) False
              filledTensor = nullTensor `T3.update` [(centerYZ 0, True), (centerYZ 1, True)]
              centerYZ x = V3 x 1 1
+
+tensor2Primitive :: Model -> Primitive
+tensor2Primitive filled | T3.size filled == (V3 1 1 1) = voxel
+                        | T3.size filled == (V3 2 2 2) = smallTensor
+                        | T3.size filled == (V3 3 3 3) = mediumTensor
+                        | otherwise                    = error "tensor2Primitive: unknown tranlation to primitive"
+  where
+    smallTensor = undefined
+    mediumTensor = undefined
