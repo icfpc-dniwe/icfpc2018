@@ -155,9 +155,9 @@ bboxHeuristics model = sm / sz
   where
     bbox = T3.boundingBox model id
     subModel = T3.slice model bbox
-    modelSum :: Sum Int
-    modelSum = foldMap (\x -> Sum $ fromBool x) subModel
+    modelSum :: Int
+    modelSum = T3.nonzero subModel
     sm :: Double
-    sm = fromIntegral $ getSum $ modelSum
+    sm = fromIntegral $ modelSum
     sz :: Double
     sz = fromIntegral $ product $ T3.size subModel

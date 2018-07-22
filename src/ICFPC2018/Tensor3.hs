@@ -16,6 +16,7 @@ module ICFPC2018.Tensor3
   , slice
   , sliceAxis
   , inBounds
+  , nonzero
   , showY
   , showZ
   , scanY
@@ -175,6 +176,10 @@ sliceAxisView (T3View {..}) Z begin end = createView tensor (zBegin, zEnd)
   where
     zBegin = closestIdx + (V3 0 0 begin)
     zEnd = closestIdx + min farthestIdx (V3 0 0 end)
+
+nonzero :: Tensor3 Bool -> Int
+nonzero (Tensor (T3 v _)) = V.length $ V.filter id v
+nonzero tensor = foldr (\idx acc -> if tensor ! idx then acc + 1 else acc) 0 $ indexing (size tensor)
 
 inBounds :: Tensor3 a -> I3 -> Bool
 inBounds tensor = inSizeBounds (size tensor)
