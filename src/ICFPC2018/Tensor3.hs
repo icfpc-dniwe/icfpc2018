@@ -65,7 +65,7 @@ checkedLinearIdx sz idx
 
 checkedIdx :: Tensor3Size -> I3 -> I3
 checkedIdx sz idx
-  | checkBounds sz idx = idx
+  | inBox sz idx = idx
   | otherwise = error "checkedIdx: invalid index"
 
 size :: Tensor3 a -> Tensor3Size
