@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+import Control.Monad
 import Data.Maybe
 import qualified Data.Vector as V
 import qualified Data.Map as M
@@ -14,6 +15,7 @@ import ICFPC2018.Utils
 import ICFPC2018.Tensor3 (Tensor3, I3)
 import ICFPC2018.Simulation
 import ICFPC2018.Model
+import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
 main :: IO ()
@@ -32,7 +34,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
 --
 
 tensor3Tests :: TestTree
-tensor3Tests = testGroup "Tensor3 Tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
+tensor3Tests = testGroup "Tensor3 tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
 
 instance Arbitrary a => Arbitrary (Tensor3 a) where
   arbitrary = do
@@ -64,15 +66,25 @@ tensor3InvalidUpdate = QC.testProperty "Invalid Tensor3 update" $ \(tensor :: Te
 -- Simulation tests
 --
 
+genEmptyExecState :: Gen ExecState
+genEmptyExecState = do
+  r <- getSize
+  return $ initialState (r + 1)
+
+genModel :: Gen Model
+genModel = do
+  r <- getSize
+  let size = fromIntegral (r + 1)
+      empty = T3.create (V.replicate (product size) False) size
+      maybeFilled = boxIndices (V3 1 0 1) (fromIntegral (r - 1))
+  filled <- filter snd <$> mapM (\i -> (i, ) <$> arbitrary) maybeFilled
+  return $ T3.update empty filled
+
 instance Arbitrary ExecState where
   arbitrary = do
-    r <- getSize
-    let size = fromIntegral (r + 1)
-        empty = T3.create (V.replicate (product size) False) size
-        maybeFilled = T3.slice empty (V3 1 0 1, fromIntegral (r - 1))
-    filled <- filter snd <$> mapM (\i -> (i, ) <$> arbitrary) maybeFilled
-    let model = T3.update empty filled
-    return $ initialState model
+    m <- genModel
+    let V3 r _ _ = T3.size m
+    return $ (initialState r) { stateMatrix = m }
 
 instance Arbitrary Axis where
   arbitrary = arbitraryBoundedEnum
@@ -86,51 +98,75 @@ genLongDifference = genLinearDifference maxLLD
 genShortDifference :: Gen I3
 genShortDifference = genLinearDifference maxSLD
 
+emptyModel :: Model
+emptyModel = T3.create (V.replicate (product size) False) size
+  where size = V3 16 16 16
+
+-- 3x2x2 cuboid
 testModel :: Model
 testModel = T3.create
             (V.fromList
-              [ False, False, False
-              , False, False, False
-              , False, False, False
+              [ False, False, False, False
+              , False, False, False, False
+              , False, False, False, False
+              , False, False, False, False
 
-              , False, True, True
-              , False, True, True
-              , False, False, False
+              , False, True, True, False
+              , False, True, True, False
+              , False, True, True, False
+              , False, False, False, False
 
-              , False, True, True
-              , False, True, True
-              , False, False, False
-              ]) (V3 3 3 3)
+              , False, True, True, False
+              , False, True, True, False
+              , False, True, True, False
+              , False, False, False, False
+
+              , False, False, False, False
+              , False, False, False, False
+              , False, False, False, False
+              , False, False, False, False
+              ]) (V3 4 4 4)
+
+runOnMatrix :: Model -> [[(Int, Command)]] -> Maybe ExecState
+runOnMatrix matrix = foldM stepState ((initialState r) { stateMatrix = matrix }) . map M.fromList
+  where V3 r _ _ = T3.size matrix
+
+runEmptyMatrix :: [[(Int, Command)]] -> Maybe ExecState
+runEmptyMatrix = runOnMatrix emptyModel
+
+runTestMatrix :: [[(Int, Command)]] -> Maybe ExecState
+runTestMatrix = runOnMatrix testModel
 
 simulationTests :: TestTree
-simulationTests = testGroup "Simulation Tests" [
+simulationTests = testGroup "Simulation tests" [
     simulationSMove
-  , simulationSMoveOutOfBounds
   , simulationLMove
-  , simulationLMoveOutOfBounds
+  , simulationSMoveErrors
+  , simulationLMoveErrors
   ]
 
 goodStep :: Model -> I3 -> I3 -> Bool
 goodStep model start step = T3.inBounds model (start + step) && all (not . (model T3.!)) (linearPath start step)
 
 simulationSMove :: TestTree
-simulationSMove = QC.testProperty "SMove" $ within (2 * 10^(6::Int)) $ forAll testValues $
+simulationSMove = QC.testProperty "SMove" $ forAll testValues $
   \(state, step) -> isJust $ stepState state (M.singleton 1 $ SMove step)
   where testValues = do
           state <- arbitrary
           step <- genLongDifference `suchThat` goodStep (stateMatrix state) 0
           return (state, step)
 
-simulationSMoveOutOfBounds :: TestTree
-simulationSMoveOutOfBounds = QC.testProperty "SMove: out of bounds" $ within (2 * 10^(6::Int)) $ forAll testValues $
-  \(state, step) -> isNothing $ stepState state (M.singleton 1 $ SMove step)
-  where testValues = do
-          state <- arbitrary
-          step <- mkLinearDifference <$> arbitrary <*> pure (maximum $ T3.size $ stateMatrix state)
-          return (state, step)
+simulationSMoveErrors :: TestTree
+simulationSMoveErrors = testGroup "SMove edge cases"
+  [ failEmpty "SMove: too far" [[(1, SMove (V3 (maxLLD + 1) 0 0))]]
+  , failEmpty "SMove: out of bounds" [[(1, SMove (V3 (-1) 0 0))]]
+  , failTest "SMove: collision" [[(1, SMove (V3 1 0 0))], [(1, SMove (V3 0 0 1))]]
+  ]
+  where failEmpty name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
+        failTest name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
 
 simulationLMove :: TestTree
-simulationLMove = QC.testProperty "LMove" $ within (2 * 10^(6::Int)) $ forAll testValues $
+simulationLMove = QC.testProperty "LMove" $ forAll testValues $
   \(state, d1, d2) -> isJust $ stepState state (M.singleton 1 $ LMove d1 d2)
   where testValues = do
           state <- arbitrary
@@ -138,13 +174,15 @@ simulationLMove = QC.testProperty "LMove" $ within (2 * 10^(6::Int)) $ forAll te
           d2 <- genShortDifference `suchThat` goodStep (stateMatrix state) d1
           return (state, d1, d2)
 
-simulationLMoveOutOfBounds :: TestTree
-simulationLMoveOutOfBounds = QC.testProperty "LMove: out of bounds" $ within (2 * 10^(6::Int)) $ forAll testValues $
-  \(state, d1, d2) -> isNothing $ stepState state (M.singleton 1 $ LMove d1 d2)
-  where testValues = do
-          state <- arbitrary
-          d1 <- mkLinearDifference <$> arbitrary <*> pure (maximum $ T3.size $ stateMatrix state)
-          return (state, d1, -d1)
+simulationLMoveErrors :: TestTree
+simulationLMoveErrors = testGroup "LMove edge cases"
+  [ failEmpty "LMove: first too far" [[(1, LMove (V3 (maxSLD + 1) 0 0) (V3 0 1 0))]]
+  , failEmpty "LMove: second too far" [[(1, LMove (V3 0 1 0) (V3 (maxSLD + 1) 0 0))]]
+  , failEmpty "LMove: out of bounds" [[(1, LMove (V3 (-1) 0 0) (V3 1 0 0))]]
+  , failTest "LMove: collision" [[(1, LMove (V3 1 0 0) (V3 0 0 1))]]
+  ]
+  where failEmpty name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
+        failTest name steps = HU.testCase name $ isNothing (runTestMatrix steps) @?= True
 
 --
 -- A* tests
@@ -177,10 +215,10 @@ checkPath model start finish path0@((first, _):_)
                 followsSteps = current + step == next
 
 aStarTests :: TestTree
-aStarTests = testGroup "A* Tests" [aStarRandom, aStarGuaranteed]
+aStarTests = testGroup "A* tests" [aStarRandom, aStarGuaranteed]
 
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` suitableModel) testPassable
+aStarRandom = QC.testProperty "A* random models passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` suitableModel) testPassable
   where suitableModel model = product (T3.size model) /= 0 && not (model T3.! start)
         start = 0
         testPassable model =
@@ -190,35 +228,37 @@ aStarRandom = QC.testProperty "A* Random Models Passable" $ within (2 * 10^(6::I
           where finish = T3.size model - 1
 
 aStarGuaranteed :: TestTree
-aStarGuaranteed = HU.testCase "A* Finds A Path" $ checkPath testModel start finish (fromJust $ immediateAStar testModel start finish) @?= True
+aStarGuaranteed = HU.testCase "A* finds a path" $ checkPath testModel start finish (fromJust $ immediateAStar testModel start finish) @?= True
   where start = 0
         finish = (T3.size testModel - 1)
 
 packTests :: TestTree
-packTests = testGroup "Pack Tests" [
-    -- emptyModelPackMove
---   , nonEmptyModelPackMove
+packTests = testGroup "Pack tests"
+  [ packMoveTest
+  , emptySingleIntension
+  , nonEmptySingleIntension
   ]
 
+packMoveTest :: TestTree
+packMoveTest = QC.testProperty "packMoves is valid" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, p) -> isJust $ foldM stepState state $ map (M.singleton 1) $ packMove 0 p
+  where testValues = do
+          state <- genEmptyExecState
+          p <- genI3 $ stateMatrix state
+          return (state, p)
 
-{-testPackMove :: SingleBotModel -> VolatileCoordinate -> VolatileCoordinate -> Bool
-testPackMove m0 c c' = (isRight result) && (fromRight c (singleBotPos <$> result) == c') where
-  m = m0 {singleBotPos = c}
-  simulateStep' em cmd = em >>= \m' -> simulateStep m' cmd
-  cmds = map snd $ fromMaybe [] $ aStar (neighbours $ filledModel m) mlenMetric c c'
-  result = foldl simulateStep' (Right m) cmds-}
+testSingleBotPackIntensions :: Intensions -> ExecState -> Bool
+testSingleBotPackIntensions intensions state =
+  isJust $ foldM stepState state $ packSingleBotIntensions (stateMatrix state) 1 (botPos $ stateBots state M.! 1) intensions
 
-{-emptyModelPackMove :: TestTree
-emptyModelPackMove = QC.testProperty "emptyModelPackMove" $ within (2 * 10^(6::Int)) $ \(
-    EmptySingleBotModel m0
-  , VolatileCoordinateWrapper c
-  , VolatileCoordinateWrapper c'
-  ) -> testPackMove m0 c c'-}
+emptySingleIntension :: TestTree
+emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within (2 * 10^(6::Int)) $ forAll testValues $
+  \(state, p) -> testSingleBotPackIntensions [FillIdx p] state
+  where testValues = do
+          state <- genEmptyExecState
+          p <- genI3 $ stateMatrix state
+          return (state, p)
 
-
--- nonEmptyModelPackMove :: TestTree
--- nonEmptyModelPackMove = QC.testProperty "nonEmptyModelPackMove" $ \(
---     NonEmptySingleBotModel m0
---   , VolatileCoordinateWrapper c
---   , VolatileCoordinateWrapper c'
---   ) -> testPackMove m0 c c'
+nonEmptySingleIntension :: TestTree
+nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within (2 * 10^(6::Int)) $
+  \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 1)] state

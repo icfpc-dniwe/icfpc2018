@@ -1,13 +1,6 @@
 module ICFPC2018.Simulation
-  ( ExecState
-  , stateEnergy
-  , stateHarmonics
-  , stateMatrix
-  , stateBots
-  , stateHalted
-  , BotState
-  , botPos
-  , botSeeds
+  ( ExecState(..)
+  , BotState(..)
   , initialState
   , stepState
   ) where
@@ -19,6 +12,8 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
+import qualified Data.Vector as V
+import Linear.V3 (V3(..))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -50,29 +45,19 @@ data BotState = BotState { botPos :: !I3
                          }
               deriving (Show, Eq)
 
---
-
-data CornerCommandGraph = Gr BotIdx ()
-
-cornerCommandGraph :: [(BotIdx, VolatileCoordinate)] -> [(BotIdx, VolatileCoordinate)] -> CornerCommandGraph
-cornerCommandGraph srcCorners dstCorners = G.mkGraph nodes edges where
-  nodes = zip (snd <$> srcCorners) $ fst <$> srcCorners
-  edges = map (\s,d -> (snd s, snd d, ())) $ zip srcCorners dstCorners
-
---
-
-initialState :: Model -> ExecState
-initialState model = ExecState { stateEnergy = 0
-                               , stateHarmonics = Low
-                               , stateMatrix = model
-                               , stateBots = M.singleton 1 initialBot
-                               , stateGFillProcessedBots = IS.empty
-                               , stateGVoidProcessedBots = IS.empty
-                               , stateHalted = False
-                               }
+initialState :: Int -> ExecState
+initialState r = ExecState { stateEnergy = 0
+                           , stateHarmonics = Low
+                           , stateMatrix = T3.create (V.replicate (product size) False) size
+                           , stateBots = M.singleton 1 initialBot
+                           , stateGFillProcessedBots = IS.empty
+                           , stateGVoidProcessedBots = IS.empty
+                           , stateHalted = False
+                           }
   where initialBot = BotState { botPos = 0
                               , botSeeds = IS.fromList [2..20]
                               }
+        size = V3 r r r
 
 stepState :: ExecState -> Step -> Maybe ExecState
 stepState state@(ExecState {..}) step = do
@@ -126,9 +111,10 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       let newBots = M.insert botIdx (botState { botPos = newPos }) stateBots
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * mlen lld }, volatiles')
     LMove sld1 sld2 -> do
-      let newPos = myPos + sld1 + sld2
-      guard $ validShortDifference sld1 && validShortDifference sld2 && T3.inBounds stateMatrix newPos
-      volatiles' <- addVolatiles state volatiles (S.fromList $ linearPath myPos sld1 ++ linearPath (myPos + sld1) sld2)
+      let cornerPos = myPos + sld1
+          newPos = cornerPos + sld2
+      guard $ validShortDifference sld1 && validShortDifference sld2 && T3.inBounds stateMatrix cornerPos && T3.inBounds stateMatrix newPos
+      volatiles' <- addVolatiles state volatiles (S.fromList $ linearPath myPos sld1 ++ linearPath cornerPos sld2)
       let newBots = M.insert botIdx (botState { botPos = newPos }) stateBots
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * (clen sld1 + clen sld2 + 2) }, volatiles')
     Fill nd -> do
@@ -184,7 +170,6 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
 
       gcRegions = groupCommandRegion <$> commandCycles
       guard $ all id $ (groupCommandRegionValid bbox) <$> gcRegions
-
 
 
   where botState = stateBots M.! botIdx
