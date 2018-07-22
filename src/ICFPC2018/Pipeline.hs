@@ -9,6 +9,8 @@ import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
 import Control.Applicative
 import Control.Monad
+import Foreign.Marshal.Utils
+import Data.Monoid (Sum(..))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -149,4 +151,13 @@ sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end
     boundings = zip (init indices) (tail indices)
 
 bboxHeuristics :: Model -> Double
-bboxHeuristics = undefined
+bboxHeuristics model = sm / sz
+  where
+    bbox = T3.boundingBox model id
+    subModel = T3.slice model bbox
+    modelSum :: Sum Int
+    modelSum = foldMap (\x -> Sum $ fromBool x) subModel
+    sm :: Double
+    sm = fromIntegral $ getSum $ modelSum
+    sz :: Double
+    sz = fromIntegral $ product $ T3.size subModel
