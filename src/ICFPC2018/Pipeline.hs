@@ -25,7 +25,7 @@ pipeline :: Model -> Trace
 pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero'
   where
     intensions = solve model $ snakeIdx (T3.size model)
-    state = case foldM stepState (initialState model) [spawnBots, firstMove] of
+    state = case let (V3 r _ _ ) = T3.size model in foldM stepState (initialState r) [spawnBots, firstMove] of
       Nothing -> error "pipeline: invalid state (firstMove)"
       Just st -> st
     (state', moves) = moveTrace state intensions
@@ -104,7 +104,7 @@ moveToZero state = M.singleton firstBot <$> commands
   where
     bots = stateBots state
     pos = botPos $ bots M.! firstBot
-    commands = packMove pos zero
+    commands = packMove pos 0
 {-
 sliceModel :: Model -> Int -> [T3.BoundingBox]
 sliceModel m0 numBots = undefined
