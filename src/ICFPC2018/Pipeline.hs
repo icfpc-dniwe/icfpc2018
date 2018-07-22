@@ -47,7 +47,7 @@ spawnBots :: Step
 spawnBots = IM.singleton firstBot $ Fission (V3 1 0 0) 0
 
 firstMove :: Step
-firstMove = IM.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
+firstMove = IM.fromList [(firstBot, LMove (V3 0 1 0) (V3 0 0 1)), (secondBot, Flip)]
 
 moveTrace :: ExecState -> Intensions -> (ExecState, Trace)
 moveTrace state intensions = helper state intensions []
@@ -97,10 +97,10 @@ fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondComman
     secondPos = botPos $ bots IM.! secondBot
     beginPos = firstPos - (V3 0 1 0)
     endPos = secondPos - (V3 0 1 (-1))
-    firstCommand | beginPos == endPos = Fill beginPos
-                 | otherwise = GFill beginPos endPos
+    firstCommand | beginPos == endPos = Fill $ beginPos - firstPos
+                 | otherwise = GFill (beginPos - firstPos) (endPos - beginPos)
     secondCommand | beginPos == endPos = Wait
-                  | otherwise = GFill endPos beginPos
+                  | otherwise = GFill (endPos - secondPos) (beginPos - endPos)
 
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]

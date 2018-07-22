@@ -22,8 +22,8 @@ main = do
   let model = runGet getModel modelData
       V3 r _ _ = T3.size model
       state0 = initialState r
-      solution = packSingleBotIntensions (stateMatrix state0) 1 0 $ solver model
-      -- solution = pipeline model
+      -- solution = packSingleBotIntensions (stateMatrix state0) 1 0 $ solver model
+      solution = pipeline model
       traceData = runPut $ putTrace solution
-  --unless (isJust $ foldM debugState (initialState r) solution) $ fail "Invalid trace"
+  unless (isJust $ foldM debugState (initialState r) solution) $ fail "Invalid trace"
   BL.writeFile tracePath traceData
