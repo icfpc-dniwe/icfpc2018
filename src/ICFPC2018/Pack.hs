@@ -54,6 +54,7 @@ shortMoves = [ (mkLinearDifference axis1 c1, mkLinearDifference axis2 c2)
              , axis1 /= axis2
              ]
 
+{-# INLINE neighbours #-}
 neighbours :: Model -> I3 -> I3 -> [(I3, Command)]
 neighbours model finish p = finishStep ++ sSteps ++ lSteps
   where isPassable from step = all (not . (model T3.!)) (linearPath from step)
@@ -111,7 +112,7 @@ packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
           upIdx      = idx + (V3 0 1 0)
           path       = map snd $ fromMaybe (error "unable move above a block") $ findPath filledModel singleBotPos upIdx
 
-      put $ m {singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
+      put $ m { singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
       return $ singleBotCommandsToTrace botIdx $ path ++ [Fill lowerVoxel]
 
     FlipGravity -> return $ singleBotCommandsToTrace botIdx [Flip]
