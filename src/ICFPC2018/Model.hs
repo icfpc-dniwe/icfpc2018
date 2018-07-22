@@ -21,7 +21,7 @@ showLayer y model = intercalate "\n" $ map showLine [0..zS-1]
         showLine z = map (\x -> if model T3.! V3 x y z then '#' else ' ') [0..xS-1]
 
 aStar :: forall i tag metric. (Show i, Show metric, Ord i, Ord metric, Num metric) => (i -> [(i, tag)]) -> (i -> i -> metric) -> i -> i -> Maybe [(i, tag)]
-aStar neighbours metric start finish = go (PQ.singleton (metric start finish) start) S.empty M.empty (M.singleton start 0)
+aStar getNeighbours metric start finish = go (PQ.singleton (metric start finish) start) S.empty M.empty (M.singleton start 0)
   where go :: MinPQueue metric i -> Set i -> Map i (i, tag) -> Map i metric -> Maybe [(i, tag)]
         -- gScore -- cost of getting from start node to that node
         -- queue weight -- cost of getting from start node to goal by passing that node
@@ -33,13 +33,16 @@ aStar neighbours metric start finish = go (PQ.singleton (metric start finish) st
               | current `S.member` closedSet0 -> go queue0' closedSet0 cameFrom0 gScore0
               | otherwise -> go queue1 (S.insert current closedSet0) cameFrom1 gScore1
               where currentScore = gScore0 M.! current
-                    (queue1, cameFrom1, gScore1) = foldr lookNeighbour (queue0', cameFrom0, gScore0) $ neighbours current
+                    (queue1, cameFrom1, gScore1) = lookNeighbours queue0' cameFrom0 gScore0 $ getNeighbours current
 
-                    lookNeighbour :: (i, tag) -> (MinPQueue metric i, Map i (i, tag), Map i metric) -> (MinPQueue metric i, Map i (i, tag), Map i metric)
-                    lookNeighbour (neighbour, tag) (queue, cameFrom, gScore) =
+                    lookNeighbours :: MinPQueue metric i -> Map i (i, tag) -> Map i metric -> [(i, tag)] -> (MinPQueue metric i, Map i (i, tag), Map i metric)
+                    lookNeighbours queue cameFrom gScore [] = (queue, cameFrom, gScore)
+                    lookNeighbours queue cameFrom gScore ((neighbour, tag):neighbours) =
                       case M.lookup neighbour gScore of
-                        Just score | score <= tentativeScore -> (queue, cameFrom, gScore)
-                        _ -> (queue', cameFrom', gScore')
+                        Just score | score <= tentativeScore -> lookNeighbours queue cameFrom gScore neighbours
+                        -- Early stop if finish is found.
+                        _ | neighbour == finish -> (queue', cameFrom', gScore')
+                          | otherwise -> lookNeighbours queue' cameFrom' gScore' neighbours
                       where tentativeScore = currentScore + metric current neighbour
                             queue' = PQ.insert (tentativeScore + metric neighbour finish) neighbour queue
                             cameFrom' = M.insert neighbour (current, tag) cameFrom
