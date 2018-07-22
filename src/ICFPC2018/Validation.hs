@@ -2,6 +2,7 @@ module ICFPC2018.Validation
   ( validLongDifference
   , validShortDifference
   , validNearDifference
+  , validFarDifference
   , fillablePoint
   ) where
 
@@ -26,6 +27,9 @@ validShortDifference = validLinearDifference maxSLD
 
 validNearDifference :: NearDifference -> Bool
 validNearDifference dist = mlen dist <= 2 && clen dist == 1
+
+validFarDifference :: FarDifference -> Bool
+validFarDifference dist = clen dist <= 30
 
 fillablePoint :: Model -> I3 -> Bool
 fillablePoint model = inBox (V3 1 0 1) (T3.size model - 2)

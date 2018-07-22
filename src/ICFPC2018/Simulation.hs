@@ -25,6 +25,8 @@ data ExecState = ExecState { stateEnergy :: !Int
                            , stateHarmonics :: !HarmonicState
                            , stateMatrix :: !Model
                            , stateBots :: !(Map BotIdx BotState)
+                           , stateGFillDone :: !Bool
+                           , stateGVoidDone :: !Bool
                            , stateHalted :: !Bool
                            }
                            deriving (Show, Eq)
@@ -41,11 +43,19 @@ data BotState = BotState { botPos :: !I3
                          }
               deriving (Show, Eq)
 
+data SilulationVoxelAction = VoxelFill | VoxelVoid
+                           deriving (Show, Eq)
+actionToBool :: SilulationVoxelAction -> Bool
+actionToBool VoxelFill = True
+actionToBool VoxelVoid = False
+
 initialState :: Int -> ExecState
 initialState r = ExecState { stateEnergy = 0
                            , stateHarmonics = Low
                            , stateMatrix = T3.create (V.replicate (product size) False) size
                            , stateBots = M.singleton 1 initialBot
+                           , stateGFillDone = False
+                           , stateGVoidDone = False
                            , stateHalted = False
                            }
   where initialBot = BotState { botPos = 0
@@ -59,11 +69,28 @@ stepState state@(ExecState {..}) step = do
   guard $ M.keys step == M.keys stateBots
   let harmonicsCost = (if stateHarmonics == Low then 3 else 30) * product (T3.size stateMatrix)
       botsCost = 20 * M.size stateBots
-      state1 = state { stateEnergy = stateEnergy + harmonicsCost + botsCost }
+      state1 = state { stateEnergy = stateEnergy + harmonicsCost + botsCost, stateGFillDone = False, stateGVoidDone = False }
   let botPositions = M.fromList $ map (\(idx, bot) -> (botPos bot, idx)) $ M.toList stateBots
   (state2, _) <- foldM (stepBot botPositions step) (state1, M.keysSet botPositions) $ M.toList step
   -- FIXME: check connectivity
   return state2
+
+botsPerformingCommand :: Step -> (Command -> Bool) -> [BotIdx]
+botsPerformingCommand step pr = M.keys $ M.filter pr step
+
+botsPerformingGFill :: Step -> [BotIdx]
+botsPerformingGFill step = botsPerformingCommand step (
+  \cmd -> case cmd of
+    (GFill _ _) -> True
+    _           -> False
+  )
+
+botsPerformingGVoid :: Step -> [BotIdx]
+botsPerformingGVoid step = botsPerformingCommand step (
+  \cmd -> case cmd of
+    (GVoid _ _) -> True
+    _           -> False
+  )
 
 stepBot :: BotPositions -> Step -> (ExecState, Set VolatileCoordinate) -> (BotIdx, Command) -> Maybe (ExecState, Set VolatileCoordinate)
 stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
@@ -88,10 +115,12 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * (clen sld1 + clen sld2 + 2) }, volatiles')
     Fill nd -> do
       let pos = myPos + nd
-          curr = stateMatrix T3.! pos
       guard $ validNearDifference nd && fillablePoint stateMatrix pos
-      volatiles' <- addVolatiles volatiles (S.singleton pos)
-      return (state { stateMatrix = T3.update stateMatrix [(pos, True)], stateEnergy = stateEnergy + (if curr then 6 else 12) }, volatiles')
+      updateRegion VoxelFill (state, volatiles) [pos]
+    Void nd -> do
+      let pos = myPos + nd
+      guard $ validNearDifference nd && fillablePoint stateMatrix pos
+      updateRegion VoxelVoid (state, volatiles) [pos]
     Fission nd m -> do
       let (childId:childSeeds, parentSeeds) = splitAt (m + 1) $ IS.toAscList $ botSeeds botState
           childPos = myPos + nd
@@ -115,8 +144,63 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       return (state { stateBots = newBots, stateEnergy = stateEnergy - 24 }, volatiles)
     -- Handled in FusionP
     FusionS _ -> return (state, volatiles)
+    GFill _ _ -> do
+      if (not stateGFillDone) then do
+        let allBots = botsPerformingGFill step
+        let allCommands = (step M.!) <$> allBots
+        guard $ all (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
+
+        let botPositions' = botPos <$> (stateBots M.!) <$> allBots
+        
+        let srcCorners = map (\((GFill nd' _), pos) -> pos + nd') $ zip allCommands botPositions'
+        let dstCorners = map (\((GFill nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions'
+        guard $ all (\c -> T3.inBounds stateMatrix c) srcCorners
+        guard $ all (\c -> T3.inBounds stateMatrix c) dstCorners
+        guard $ all (\c -> elem c srcCorners) dstCorners
+
+        let bboxes = map (\(s,d) -> getBox s d) $ zip srcCorners dstCorners
+        let distinctRegions = S.toList $ S.fromList bboxes
+        guard $ not $ any id $ concat $ map (\pos -> map (\(b0,b1) -> inBox b0 b1 pos) distinctRegions) botPositions'
+
+        (state', volatiles') <- foldM (updateRegion VoxelFill) (state, volatiles) $ map (\(b0,b1) -> boxIndices b0 b1) distinctRegions
+        return $ (state' { stateGVoidDone = True }, volatiles')
+      else do
+        return (state, volatiles)
+    GVoid _ _ -> do
+      if (not stateGVoidDone) then do
+        let allBots = botsPerformingGVoid step
+        let allCommands = (step M.!) <$> allBots
+        guard $ all (\(GVoid nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
+
+        let botPositions' = botPos <$> (stateBots M.!) <$> allBots
+        
+        let srcCorners = map (\((GVoid nd' _), pos) -> pos + nd') $ zip allCommands botPositions'
+        let dstCorners = map (\((GVoid nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions'
+        guard $ all (\c -> T3.inBounds stateMatrix c) srcCorners
+        guard $ all (\c -> T3.inBounds stateMatrix c) dstCorners
+        guard $ all (\c -> elem c srcCorners) dstCorners
+
+        let bboxes = map (\(s,d) -> getBox s d) $ zip srcCorners dstCorners
+        let distinctRegions = S.toList $ S.fromList bboxes
+        guard $ not $ any id $ concat $ map (\pos -> map (\(b0,b1) -> inBox b0 b1 pos) distinctRegions) botPositions'
+
+        (state', volatiles') <- foldM (updateRegion VoxelVoid) (state, volatiles) $ map (\(b0,b1) -> boxIndices b0 b1) distinctRegions
+        return $ (state' { stateGVoidDone = True }, volatiles')
+      else do
+        return (state, volatiles)
+
   where botState = stateBots M.! botIdx
         myPos = botPos botState
+        updateEnergyDelta action occupied = case action of
+                                              VoxelFill -> if occupied then 6 else 12
+                                              VoxelVoid -> if occupied then -12 else 3
+        updateRegion action (state'', volatiles'') voxels = do
+          volatiles' <- addVolatiles volatiles'' (S.fromList voxels)
+          let energyDelta = sum $ (updateEnergyDelta action) <$> (stateMatrix T3.!) <$> voxels
+          return (state'' {
+              stateMatrix = T3.update stateMatrix $ zip voxels [(actionToBool action)..],
+              stateEnergy = stateEnergy + energyDelta
+            }, volatiles')
         addFreeVolatiles newVolatiles = do
           guard $ all (not . (stateMatrix T3.!)) newVolatiles
           addVolatiles volatiles newVolatiles
