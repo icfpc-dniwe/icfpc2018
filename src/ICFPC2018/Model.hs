@@ -20,9 +20,11 @@ showLayer y model = intercalate "\n" $ map showLine [0..zS-1]
   where V3 xS _ zS = T3.size model
         showLine z = map (\x -> if model T3.! V3 x y z then '#' else ' ') [0..xS-1]
 
-aStar :: forall i tag metric. (Ord i, Ord metric, Num metric) => (i -> [(i, tag)]) -> (i -> i -> metric) -> i -> i -> Maybe [(i, tag)]
-aStar neighbours metric start finish = go (PQ.singleton (metric finish start) start) S.empty M.empty (M.singleton start 0)
+aStar :: forall i tag metric. (Show i, Show metric, Ord i, Ord metric, Num metric) => (i -> [(i, tag)]) -> (i -> i -> metric) -> i -> i -> Maybe [(i, tag)]
+aStar neighbours metric start finish = go (PQ.singleton (metric start finish) start) S.empty M.empty (M.singleton start 0)
   where go :: MinPQueue metric i -> Set i -> Map i (i, tag) -> Map i metric -> Maybe [(i, tag)]
+        -- gScore -- cost of getting from start node to that node
+        -- queue weight -- cost of getting from start node to goal by passing that node
         go queue0 closedSet0 cameFrom0 gScore0 =
           case PQ.minView queue0 of
             Nothing -> Nothing
@@ -38,8 +40,8 @@ aStar neighbours metric start finish = go (PQ.singleton (metric finish start) st
                       case M.lookup neighbour gScore of
                         Just score | score <= tentativeScore -> (queue, cameFrom, gScore)
                         _ -> (queue', cameFrom', gScore')
-                      where tentativeScore = currentScore + metric neighbour current
-                            queue' = PQ.insert tentativeScore neighbour queue
+                      where tentativeScore = currentScore + metric current neighbour
+                            queue' = PQ.insert (tentativeScore + metric neighbour finish) neighbour queue
                             cameFrom' = M.insert neighbour (current, tag) cameFrom
                             gScore' = M.insert neighbour tentativeScore gScore
         traverseBack cameFrom current path

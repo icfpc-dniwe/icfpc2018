@@ -39,7 +39,7 @@ library
                      , LambdaCase
                      , RecordWildCards
                      , ScopedTypeVariables
-  ghc-options:         -Wall
+  ghc-options:         -Wall -fprof-auto
 
 executable solver
   main-is:             Solver.hs
@@ -50,7 +50,7 @@ executable solver
                      , linear
   hs-source-dirs:      exe
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -fprof-auto
 
 test-suite tests
   main-is:             Tests.hs
@@ -70,4 +70,4 @@ test-suite tests
                      , LambdaCase
                      , RecordWildCards
                      , TupleSections
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -fprof-auto

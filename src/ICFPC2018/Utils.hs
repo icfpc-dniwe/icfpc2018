@@ -51,6 +51,7 @@ mlen v = sum $ abs <$> v
 clen :: Integral a => V3 a -> a
 clen v = foldr1 max $ abs <$> v
 
+{-# INLINE linearPath #-}
 linearPath :: V3 Int -> V3 Int -> [V3 Int]
 linearPath from path
   | path == 0 = []
