@@ -6,7 +6,8 @@ import Data.Maybe
 import Data.Vector.Unboxed (Unbox)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.IntSet as IS
-import qualified Data.Map as M
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IM
 import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
@@ -137,7 +138,7 @@ testModel = T3.create
               ]) (V3 4 4 4)
 
 runOnMatrix :: Model -> ExecState -> [[(Int, Command)]] -> Maybe ExecState
-runOnMatrix matrix initState = foldM stepState (initState { stateMatrix = matrix }) . map M.fromList
+runOnMatrix matrix initState = foldM stepState (initState { stateMatrix = matrix }) . map IM.fromList
 
 runOnMatrix' :: Model -> [[(Int, Command)]] -> Maybe ExecState
 runOnMatrix' matrix = runOnMatrix matrix $ initialState r where
@@ -169,7 +170,7 @@ goodStep model start step = T3.inBounds model (start + step) && all (not . (mode
 
 simulationSMove :: TestTree
 simulationSMove = QC.testProperty "SMove" $ forAll testValues $
-  \(state, step) -> isJust $ stepState state (M.singleton 1 $ SMove step)
+  \(state, step) -> isJust $ stepState state (IM.singleton 1 $ SMove step)
   where testValues = do
           state <- arbitrary
           step <- genLongDifference `suchThat` goodStep (stateMatrix state) 0
@@ -186,7 +187,7 @@ simulationSMoveErrors = testGroup "SMove edge cases"
 
 simulationLMove :: TestTree
 simulationLMove = QC.testProperty "LMove" $ forAll testValues $
-  \(state, d1, d2) -> isJust $ stepState state (M.singleton 1 $ LMove d1 d2)
+  \(state, d1, d2) -> isJust $ stepState state (IM.singleton 1 $ LMove d1 d2)
   where testValues = do
           state <- arbitrary
           d1 <- genShortDifference `suchThat` goodStep (stateMatrix state) 0
@@ -229,7 +230,7 @@ initialGFillBots R2B16F = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3
 initialGFillBots R1B7F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 5 1 0, V3 5 5 0, V3 5 5 1]
 
 genGFillStep' :: [Command] -> Step
-genGFillStep' cmds = M.fromList $ zip [1..] cmds
+genGFillStep' cmds = IM.fromList $ zip [1..] cmds
 
 genGFillStep :: GFillTestPrimitive -> Step
 genGFillStep R1B2P  = genGFillStep' [GFill (V3   0    0    1 ) (V3   0    0    2 ),
@@ -289,7 +290,7 @@ genGFillStep R2B8F  = genGFillStep R2B8P
 genGFillStep R2B16F = genGFillStep R2B16P
 genGFillStep R1B7F  = genGFillStep R1B8P
 
-initialGFillState :: M.Map BotIdx BotState -> ExecState
+initialGFillState :: IntMap BotState -> ExecState
 initialGFillState bots = ExecState {
     stateEnergy = 0
   , stateHarmonics = High
@@ -306,10 +307,10 @@ simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests whe
   succEmpty name bots steps = HU.testCase name $ isJust (runEmptyMatrix (initialGFillState bots) steps) @?= True
   failCases = [R1B2F, R1B4F, R1B8F, R2B4F, R2B8F, R2B16F, R1B7F]
   succCases = [R1B2P, R1B4P, R1B8P, R2B4P, R2B8P, R2B16P]
-  failBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) failCases
-  succBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) succCases
-  failTests = map (\(bots, gen) -> failEmpty ("GFill: " ++ show gen) bots [M.toList $ genGFillStep gen]) $ zip failBots failCases
-  succTests = map (\(bots, gen) -> succEmpty ("GFill: " ++ show gen) bots [M.toList $ genGFillStep gen]) $ zip succBots succCases
+  failBots = map (\gen -> IM.fromList $ zip [1..] $ initialGFillBots gen) failCases
+  succBots = map (\gen -> IM.fromList $ zip [1..] $ initialGFillBots gen) succCases
+  failTests = map (\(bots, gen) -> failEmpty ("GFill: " ++ show gen) bots [IM.toList $ genGFillStep gen]) $ zip failBots failCases
+  succTests = map (\(bots, gen) -> succEmpty ("GFill: " ++ show gen) bots [IM.toList $ genGFillStep gen]) $ zip succBots succCases
 
 --
 -- A* tests
@@ -370,7 +371,7 @@ packTests = testGroup "Pack tests"
 
 packMoveTest :: TestTree
 packMoveTest = QC.testProperty "packMoves is valid" $ within pathFindingTime $ forAll testValues $
-  \(state, p) -> isJust $ foldM stepState state $ map (M.singleton 1) $ packMove 0 p
+  \(state, p) -> isJust $ foldM stepState state $ map (IM.singleton 1) $ packMove 0 p
   where testValues = do
           state <- genEmptyExecState
           p <- genI3 $ stateMatrix state
@@ -378,7 +379,7 @@ packMoveTest = QC.testProperty "packMoves is valid" $ within pathFindingTime $ f
 
 testSingleBotPackIntensions :: Intensions -> ExecState -> Bool
 testSingleBotPackIntensions intensions state =
-  isJust $ foldM stepState state $ packSingleBotIntensions (stateMatrix state) 1 (botPos $ stateBots state M.! 1) intensions
+  isJust $ foldM stepState state $ packSingleBotIntensions (stateMatrix state) 1 (botPos $ stateBots state IM.! 1) intensions
 
 genFillablePoint :: ExecState -> Gen I3
 genFillablePoint state = do
@@ -409,7 +410,7 @@ solverTest name solver = QC.testProperty (name ++ " solver") $ within (4 * pathF
       state0 = initialState r
       commands = solver state0 model
   -- in isJust $ foldM debugState state0 $ traceShow (r, length commands) commands
-  in M.size (last commands) == 1
+  in IM.size (last commands) == 1
 
 {-
 floodFillTests :: TestTree

@@ -4,7 +4,7 @@ module ICFPC2018.Pack
   ) where
 
 import Data.Maybe
-import qualified Data.Map.Strict as M
+import qualified Data.IntMap.Strict as IM
 import Linear.V3 (V3(..))
 import Control.Monad.ST
 import Control.Monad.Trans.Class
@@ -89,7 +89,7 @@ findPath :: Model -> I3 -> I3 -> Maybe [(I3, Command)]
 findPath model start finish = aStar (neighbours model finish) mlenDistance start finish
 
 singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
-singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds
+singleBotCommandsToTrace bid cmds = IM.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds
 
 packSingleBotIntensions :: Model -> BotIdx -> I3 -> Intensions -> Trace
 packSingleBotIntensions model0 botIdx botPos0 xs = singleBotCommandsToTrace botIdx $ t1 ++ t2 where

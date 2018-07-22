@@ -5,13 +5,11 @@ module ICFPC2018.Pipeline
   , bboxHeuristics
   ) where
 
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IM
 import Linear.V3 (V3(..))
 import Control.Applicative
 import Control.Monad
-import Foreign.Marshal.Utils
-import Data.Monoid (Sum(..))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -43,13 +41,13 @@ pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [ha
       Nothing -> error "pipeline: invalid state (endStep)"
       Just st -> st
     moveToZero' = moveToZero state''
-    haltStep = M.singleton firstBot Halt
+    haltStep = IM.singleton firstBot Halt
 
 spawnBots :: Step
-spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) 0
+spawnBots = IM.singleton firstBot $ Fission (V3 1 0 0) 0
 
 firstMove :: Step
-firstMove = M.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
+firstMove = IM.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
 
 moveTrace :: ExecState -> Intensions -> (ExecState, Trace)
 moveTrace state intensions = helper state intensions []
@@ -67,22 +65,22 @@ moveTrace state intensions = helper state intensions []
           st' = proceedState st curTrace
           fillMove = [fillLine st']
 
-moveBots :: ExecState -> Intensions -> Maybe (Map BotIdx [Command], Intensions)
+moveBots :: ExecState -> Intensions -> Maybe (IntMap [Command], Intensions)
 moveBots state intensions = case getNextLine intensions of
   Nothing -> Nothing
-  Just ((beginPos, endPos), xs) -> Just (M.fromList [(firstBot, firstCommands), (secondBot, secondCommands)], xs)
+  Just ((beginPos, endPos), xs) -> Just (IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)], xs)
     where
       bots = stateBots state
       beginPos' = beginPos + (V3 0 1 0)
       endPos' = endPos + (V3 0 1 (-1))
-      firstCommands = packMove (botPos $ bots M.! firstBot) beginPos'
-      secondCommands = packMove (botPos $ bots M.! secondBot) endPos'
+      firstCommands = packMove (botPos $ bots IM.! firstBot) beginPos'
+      secondCommands = packMove (botPos $ bots IM.! secondBot) endPos'
 
-mergeCommands :: Map BotIdx [Command] -> Trace
-mergeCommands commands = getZipList $ (\m v -> M.insert secondBot v m) <$> (M.singleton firstBot <$> firstCommands') <*> secondCommands'
+mergeCommands :: IntMap [Command] -> Trace
+mergeCommands commands = getZipList $ (\m v -> IM.insert secondBot v m) <$> (IM.singleton firstBot <$> firstCommands') <*> secondCommands'
   where
-    firstCommands = commands M.! firstBot
-    secondCommands = commands M.! secondBot
+    firstCommands = commands IM.! firstBot
+    secondCommands = commands IM.! secondBot
     firstIsShorter = length firstCommands < length secondCommands
     firstCommands' = if firstIsShorter
                      then ZipList $ firstCommands ++ (repeat Wait)
@@ -92,11 +90,11 @@ mergeCommands commands = getZipList $ (\m v -> M.insert secondBot v m) <$> (M.si
                       else ZipList $ secondCommands ++ (repeat Wait)
 
 fillLine :: ExecState -> Step
-fillLine state = M.fromList [(firstBot, firstCommand), (secondBot, secondCommand)]
+fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondCommand)]
   where
     bots = stateBots state
-    firstPos = botPos $ bots M.! firstBot
-    secondPos = botPos $ bots M.! secondBot
+    firstPos = botPos $ bots IM.! firstBot
+    secondPos = botPos $ bots IM.! secondBot
     beginPos = firstPos - (V3 0 1 0)
     endPos = secondPos - (V3 0 1 (-1))
     firstCommand | beginPos == endPos = Fill beginPos
@@ -108,19 +106,19 @@ endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
   where
     bots = stateBots state
-    firstPos = botPos $ bots M.! firstBot
-    secondPos = botPos $ bots M.! secondBot
+    firstPos = botPos $ bots IM.! firstBot
+    secondPos = botPos $ bots IM.! secondBot
     firstCommands = [Flip]
     nextCoord = V3 0 0 (-1)
     secondCommands = packMove secondPos $ firstPos + nextCoord
-    prepareMoves = mergeCommands $ M.fromList [(firstBot, firstCommands), (secondBot, secondCommands)]
-    fusionStep = M.fromList [(firstBot, FusionP nextCoord), (secondBot, FusionS (-nextCoord))]
+    prepareMoves = mergeCommands $ IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)]
+    fusionStep = IM.fromList [(firstBot, FusionP nextCoord), (secondBot, FusionS (-nextCoord))]
 
 moveToZero :: ExecState -> Trace
-moveToZero state = M.singleton firstBot <$> commands
+moveToZero state = IM.singleton firstBot <$> commands
   where
     bots = stateBots state
-    pos = botPos $ bots M.! firstBot
+    pos = botPos $ bots IM.! firstBot
     commands = packMove pos 0
 
 solve :: Model -> [I3] -> Intensions

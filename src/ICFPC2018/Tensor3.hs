@@ -100,8 +100,10 @@ sizeT (T3 _ sz) = sz
 
 infixl 9 `index`
 index :: Unbox a => Tensor3 a -> I3 -> a
-index (Tensor (T3 v sz)) idx = v `V.unsafeIndex` checkedLinearIdx sz idx
-index (View (T3View { tensor = T3 dat sz, .. })) idx = dat `V.unsafeIndex` linearIdx sz (closestIdx + checkedIdx sizeView idx)
+index (Tensor (T3 v sz)) idx = lidx `seq` (v `V.unsafeIndex` lidx)
+  where lidx = checkedLinearIdx sz idx
+index (View (T3View { tensor = T3 dat sz, .. })) idx = lidx `seq` (dat `V.unsafeIndex` lidx)
+  where lidx = linearIdx sz (closestIdx + checkedIdx sizeView idx)
 
 infixl 9 !
 (!) :: Unbox a => Tensor3 a -> I3 -> a
@@ -126,7 +128,9 @@ update (View tView) updates = View $ tView `updateView` updates
 
 updateT :: Unbox a => T3 a -> [(I3, a)] -> T3 a
 updateT tensor [] = tensor
-updateT (T3 v sz) updates = T3 (V.unsafeUpd v $ map (first $ checkedLinearIdx sz) updates) sz
+updateT (T3 v sz) updates = T3 (V.unsafeUpd v $ map convert updates) sz
+  where convert (idx, val) = iidx `seq` (iidx, val)
+          where iidx = checkedLinearIdx sz idx
 
 updateView :: Unbox a => T3View a -> [(I3, a)] -> T3View a
 updateView tensor [] = tensor
@@ -243,7 +247,9 @@ unsafeFreeze :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> m (Tensor3
 unsafeFreeze (MT3 dat sz) = Tensor <$> (T3 <$> MV.unsafeFreeze dat <*> pure sz)
 
 read :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> I3 -> m a
-read (MT3 dat sz) idx = MV.unsafeRead dat $ checkedLinearIdx sz idx
+read (MT3 dat sz) idx = (lidx `seq`) <$> MV.unsafeRead dat lidx
+  where lidx = checkedLinearIdx sz idx
 
 write :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> I3 -> a -> m ()
-write (MT3 dat sz) idx val = MV.unsafeWrite dat (checkedLinearIdx sz idx) val
+write (MT3 dat sz) idx val = MV.unsafeWrite dat lidx (lidx `seq` val)
+  where lidx = checkedLinearIdx sz idx

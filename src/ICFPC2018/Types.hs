@@ -1,6 +1,6 @@
 module ICFPC2018.Types where
 
-import Data.Map (Map)
+import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import ICFPC2018.Tensor3 (MTensor3, Tensor3, I3, Axis(..))
@@ -57,7 +57,7 @@ data Command
 
 instance NFData Command
 
-type Step = Map BotIdx Command
+type Step = IntMap Command
 type Trace = [Step]
 type Score = Int
 

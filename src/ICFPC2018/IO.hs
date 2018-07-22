@@ -7,7 +7,7 @@ import Data.Word
 import Data.Bits
 import Linear.V3 (V3(..))
 import qualified Data.Vector.Unboxed as V
-import qualified Data.Map as M
+import qualified Data.IntMap as IM
 import Data.Binary.Get
 import Data.Binary.Put
 
@@ -83,4 +83,4 @@ putCommand (GVoid nd fd) = putWord8 byte >> mapM_ (putWord8 . fromIntegral) fd
         byte = 0b000 .|. (end `shiftL` 3)
 
 putTrace :: Trace -> Put
-putTrace = mapM_ (mapM_ putCommand . map snd . M.toAscList)
+putTrace = mapM_ (mapM_ putCommand . map snd . IM.toAscList)
