@@ -16,7 +16,10 @@ module ICFPC2018.Tensor3
   , slice
   , sliceAxis
   , inBounds
-  , printTensor
+  , showY
+  , showZ
+  , scanY
+  , scanZ
   ) where
 
 import Prelude hiding (replicate)
@@ -198,10 +201,24 @@ instance Traversable T3 where
   traverse fun (T3 v sz) = T3 <$> traverse fun v <*> pure sz
 
 
-printTensor :: (Show a) => Tensor3 a -> IO ()
-printTensor t = mapM_ (\j -> printLayer j >> hr) (reverse [0..(h-1)]) where
-  (V3 w h d) = size t
-  hr = putStrLn $ take w . repeat $ '-'
+showY :: (Show a) => Int -> Tensor3 a -> String
+showY y t = unlines $ map (\z -> concatMap (\x -> show $ t ! (V3 x y z)) [0..(w-1)]) [0..(d-1)] where
+  (V3 w _h d) = size t
 
-  printLayer j  = mapM_ (printLine j) [0..(d-1)]
-  printLine j k = putStrLn (concatMap (\i -> show (t ! (V3 i j k))) [0..(w-1)])
+showZ :: (Show a) => Int -> Tensor3 a -> String
+showZ z t = unlines $ map (\y -> concatMap (\x -> show $ t ! (V3 x y z)) [0..(w-1)]) [0..(h-1)] where
+  (V3 w h _d) = size t
+
+scanY :: String -> Tensor3 Char
+scanY s = (replicate (V3 n n n) ' ') `update` upd where
+  ls = lines s
+  n  = length ls
+  enum = zip [0..(n-1)]
+  upd = [(V3 x y z, v) | y <- [0..(n-1)], (z, w) <- (enum (map enum ls)), (x, v) <- w]
+
+scanZ :: String -> Tensor3 Char
+scanZ s = (replicate (V3 n n n) ' ') `update` upd where
+  ls = lines s
+  n  = length ls
+  enum = zip [0..(n-1)]
+  upd = [(V3 x y z, v) | z <- [0..(n-1)], (y, w) <- (enum (map enum ls)), (x, v) <- w]

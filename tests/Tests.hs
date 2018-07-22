@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import Control.Monad
@@ -9,6 +10,8 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
+import Data.List (dropWhileEnd)
+import Text.Heredoc
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -30,6 +33,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , aStarTests
   , packTests
   , solverTests
+  , floodFillTests
   ]
 
 --
@@ -286,3 +290,69 @@ solverTest name solver = QC.testProperty (name ++ " solver") $ within (4 * pathF
       commands = solver state0 model
   -- in isJust $ foldM debugState state0 $ traceShow (r, length commands) commands
   in M.size (last commands) == 1
+
+floodFillTests :: TestTree
+floodFillTests = testGroup "FloodFill Tests" [
+    mkFloodFillTest "t1"
+      [here|
+        000
+        000
+        000|]
+      [(V3 0 0 0, 1 :: Int)]
+      [here|
+        111
+        111
+        111|]
+
+  , mkFloodFillTest "t2"
+      [here|
+        01000
+        01010
+        01010
+        01010
+        00010|]
+      [ (V3 0 0 0, 2 :: Int)
+      , (V3 1 0 0, 3 :: Int)
+      , (V3 3 0 1, 4 :: Int)]
+      [here|
+        23222
+        23242
+        23242
+        23242
+        22242|]
+
+  , mkFloodFillTest "t3"
+      [here|
+        00100100
+        01001001
+        10010010
+        00100100
+        01001001
+        10010010
+        00100100
+        01001000|]
+      [ (V3 7 0 0, 1 :: Int)
+      , (V3 7 0 0, 0 :: Int)
+      , (V3 7 0 0, 1 :: Int)
+      , (V3 7 0 0, 2 :: Int)]
+      [here|
+        00222222
+        02222222
+        22222222
+        22222222
+        22222222
+        22222220
+        22222200
+        22222000|]
+  ]
+
+
+mkFloodFillTest :: (Read a, Show a, Eq a) => String -> String -> [(I3, a)] -> String -> TestTree
+mkFloodFillTest name s fs s' = QC.testProperty name
+  $ (== cleanup s')
+  . cleanup
+  . T3.showY 0
+  . (\m -> foldl (\m' (idx, v) -> floodFill idx v m') m fs)
+  . fmap (read . pure)
+  $ T3.scanY (cleanup s) where
+  cleanup = dropWhileEnd (== '\n') . dropWhile (=='\n') . filter (/= ' ')
