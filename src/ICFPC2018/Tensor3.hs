@@ -13,7 +13,6 @@ module ICFPC2018.Tensor3
   , replicate
   , boundingBox
   , slice
-  , sliceView
   , sliceAxis
   , inBounds
   ) where
@@ -55,12 +54,12 @@ tensorIdx linIdx (V3 xSize ySize zSize) = (V3 x y z) where
 
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
 checkedLinearIdx sz idx
-  | inBox sz idx = linearIdx sz idx
+  | inSizeBounds sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
 checkedIdx :: Tensor3Size -> I3 -> I3
 checkedIdx sz idx
-  | inBox sz idx = idx
+  | inSizeBounds sz idx = idx
   | otherwise = error "checkedIdx: invalid index"
 
 size :: Tensor3 a -> Tensor3Size
@@ -129,13 +128,9 @@ boundingBox tensor pr = foldr helper (sz - (V3 1 1 1), V3 0 0 0) (indexing sz)
       | pr (tensor ! idx) = (min <$> idx <*> closest, max <$> idx <*> farthest)
       | otherwise = bbox
 
--- TODO: change to Tensor3 a -> BoundingBox -> Tensor3View
-slice :: Tensor3 a -> BoundingBox -> [I3]
-slice tensor ((V3 x0 y0 z0), (V3 x1 y1 z1)) = filter (\(V3 x y z) -> all id [x0 <= x, x1 >= x, y0 <= y, y1 >= y, z0 <= z, z1 >= z]) $ indexing $ size tensor
-
-sliceView :: Tensor3 a -> BoundingBox -> Tensor3 a
-sliceView (Tensor tensor) bbox = View $ createView tensor bbox
-sliceView (View (T3View {..})) (closestNew, farthestNew)
+slice :: Tensor3 a -> BoundingBox -> Tensor3 a
+slice (Tensor tensor) bbox = View $ createView tensor bbox
+slice (View (T3View {..})) (closestNew, farthestNew)
   | closestNew >= (V3 0 0 0) &&
     farthestNew < sizeView = View $ createView tensor bbox
   | otherwise = error "changeView: invalind bounding box"
@@ -166,7 +161,7 @@ sliceAxisView (T3View {..}) Z begin end = createView tensor (zBegin, zEnd)
     zEnd = closestIdx + min farthestIdx (V3 0 0 end)
 
 inBounds :: Tensor3 a -> I3 -> Bool
-inBounds tensor = inBox (size tensor)
+inBounds tensor = inSizeBounds (size tensor)
 
 instance Foldable T3 where
   foldMap fun (T3 v _) = foldMap fun v
