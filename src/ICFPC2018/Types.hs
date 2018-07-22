@@ -25,6 +25,7 @@ type Difference = V3 Int
 type ShortDifference = Difference
 type LongDifference  = Difference
 type NearDifference  = Difference
+type FarDifference  = Difference
 
 data HarmonicState = Low | High deriving (Show, Eq)
 
@@ -44,6 +45,7 @@ data Command
   -- Group commands
   | FusionP !NearDifference
   | FusionS !NearDifference
+  | GFill !NearDifference !FarDifference
   deriving (Show, Eq)
 type Step = Map BotIdx Command
 type Trace = [Step]
