@@ -25,9 +25,5 @@ main = do
       solution = packSingleBotIntensions (stateMatrix state0) 1 0 $ solver model
       -- solution = pipeline model
       traceData = runPut $ putTrace solution
-
-      debugState state step = case stepState state step of
-        Just state' -> Just state'
-        Nothing -> traceShow (state, step) Nothing
   unless (isJust $ foldM debugState (initialState r) solution) $ fail "Invalid trace"
   BL.writeFile tracePath traceData

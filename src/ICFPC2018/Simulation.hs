@@ -21,14 +21,9 @@ import Control.DeepSeq
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
-import ICFPC2018.Tensor3 (Tensor3, I3)
+import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Validation
-import Linear.V3 (V3(..))
-import Control.Monad.State.Strict
-import Control.Arrow (first, second)
-import Data.Maybe (catMaybes)
-import Data.Either (fromRight)
 
 data ExecState = ExecState { stateEnergy :: !Int
                            , stateHarmonics :: !HarmonicState
