@@ -1,6 +1,9 @@
 module ICFPC2018.Model
   ( showLayer
   , aStar
+  --, VoxelStatus(..)
+  --, decomposeModel
+  --, floodFill
   ) where
 
 import Data.List
@@ -20,6 +23,7 @@ showLayer y model = intercalate "\n" $ map showLine [0..zS-1]
   where V3 xS _ zS = T3.size model
         showLine z = map (\x -> if model T3.! V3 x y z then '#' else ' ') [0..xS-1]
 
+{-# INLINE aStar #-}
 aStar :: forall i tag metric. (Show i, Show metric, Ord i, Ord metric, Num metric) => (i -> [(i, tag)]) -> (i -> i -> metric) -> i -> i -> Maybe [(i, tag)]
 aStar getNeighbours metric start finish = go (PQ.singleton (metric start finish) start) S.empty M.empty (M.singleton start 0)
   where go :: MinPQueue metric i -> Set i -> Map i (i, tag) -> Map i metric -> Maybe [(i, tag)]
@@ -51,3 +55,56 @@ aStar getNeighbours metric start finish = go (PQ.singleton (metric start finish)
           | current == start = path
           | otherwise = traverseBack cameFrom prev (step : path)
           where step@(prev, _) = cameFrom M.! current
+
+{-
+data VoxelStatus
+  = VSUnknown
+  | VSEmpty
+  | VSGrounded
+  | VSFloating
+  deriving Eq
+
+instance Show VoxelStatus where
+  show VSUnknown  = "@"
+  show VSEmpty    = " "
+  show VSGrounded = "."
+  show VSFloating = "!"
+
+decomposeModel :: Model -> ([(I3, VoxelStatus)], Tensor3 VoxelStatus)
+decomposeModel m
+  = second (fmap (fromRight VSUnknown))
+  . first catMaybes
+  $ runState (mapM step idxs) (fmap Left m)
+  where
+    V3 w h d = T3.size m
+    idxs = [(V3 x y z) | y <- [0..(h-1)], x <- [0..(w-1)], z <- [0..(d-1)]]
+
+    step :: I3 -> State (Tensor3 (Either Bool VoxelStatus)) (Maybe (I3, VoxelStatus))
+    step idx@(V3 _ y _) = get >>= \s -> case (s T3.! idx) of
+      Left b -> do
+        let t = case b of
+                  False -> VSEmpty
+                  True  -> if (y == 0) then VSGrounded else VSFloating
+        put (floodFill idx (Right t) s)
+        return $ Just (idx, t)
+      _ -> return Nothing
+
+
+floodFill :: forall a. (Eq a) => I3 -> a -> Tensor3 a -> Tensor3 a
+floodFill idx0 v m0 = execState (step idx0) m0 where
+  sz = T3.size m0
+
+  step :: I3 -> State (Tensor3 a) ()
+  step idx = gets (T3.! idx) >>= \v0 -> case (v0 == v) of
+    True  -> return ()
+    False -> do
+      modify (\m -> T3.update m [(idx, v)])
+      mapM_ (\idx' -> get >>= \m' -> when (m' T3.! idx' == v0) $ step idx') (adjacent idx)
+
+  adjacent :: I3 -> [I3]
+  adjacent idx = filter (inSizeBounds sz) . map (idx+) $ [
+      (V3 1 0 0), -(V3 1 0 0)
+    , (V3 0 1 0), -(V3 0 1 0)
+    , (V3 0 0 1), -(V3 0 0 1)
+    ]
+-}

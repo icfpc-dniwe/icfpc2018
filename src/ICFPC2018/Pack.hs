@@ -12,6 +12,7 @@ import Control.Arrow (first)
 import ICFPC2018.Tensor3 (I3, Axis(..))
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
+import ICFPC2018.Validation
 import ICFPC2018.Utils
 import ICFPC2018.Model
 
@@ -53,25 +54,37 @@ shortMoves = [ (mkLinearDifference axis1 c1, mkLinearDifference axis2 c2)
              , axis1 /= axis2
              ]
 
-neighbours :: Model -> I3 -> [(I3, Command)]
-neighbours model p = sSteps ++ lSteps
-  where sSteps = mapMaybe validSMove longMoves
+neighbours :: Model -> I3 -> I3 -> [(I3, Command)]
+neighbours model finish p = finishStep ++ sSteps ++ lSteps
+  where isPassable from step = all (not . (model T3.!)) (linearPath from step)
+
+        finishStep
+          | validLongDifference dFinish, Just move <- validSMove dFinish = [move]
+          | Just (d1, d2) <- splitPlanar dFinish
+          , validShortDifference d1 && validShortDifference d2 = mapMaybe validLMove [(d1, d2), (d2, d1)]
+          | otherwise = []
+          where dFinish = finish - p
+        sSteps = mapMaybe validSMove longMoves
         lSteps = mapMaybe validLMove shortMoves
 
         validSMove d
           | T3.inBounds model newP &&
-            all (not . (model T3.!)) (linearPath p d)
+            isPassable p d
           = Just (newP, SMove d)
           | otherwise = Nothing
           where newP = p + d
         validLMove (d1, d2)
           | T3.inBounds model newP1 &&
             T3.inBounds model newP2 &&
-            all (not . (model T3.!)) (linearPath p d1 ++ linearPath newP1 d2)
+            isPassable p d1 &&
+            isPassable newP1 d2
           = Just (newP2, LMove d1 d2)
           | otherwise = Nothing
           where newP1 = p + d1
                 newP2 = newP1 + d2
+
+findPath :: Model -> I3 -> I3 -> Maybe [(I3, Command)]
+findPath model start finish = aStar (neighbours model finish) mlenDistance start finish
 
 singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
 singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
@@ -86,7 +99,7 @@ packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
   (t1, m1) = first concat . (flip runState m0) . mapM packIntension $ xs
 
   t2 = singleBotCommandsToTrace botIdx
-       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m1) mlenDistance (singleBotPos m1) 0)
+       $ (map snd $ fromMaybe (error "unable to return to zero") $ findPath (filledModel m1) (singleBotPos m1) 0)
        ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
@@ -96,7 +109,7 @@ packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
 
       let lowerVoxel = V3 0 (-1) 0
           upIdx      = idx + (V3 0 1 0)
-          path       = map snd $ fromMaybe (error "unable move above a block") $ aStar (neighbours filledModel) mlenDistance singleBotPos upIdx
+          path       = map snd $ fromMaybe (error "unable move above a block") $ findPath filledModel singleBotPos upIdx
 
       put $ m {singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
       return $ singleBotCommandsToTrace botIdx $ path ++ [Fill lowerVoxel]

@@ -4,16 +4,18 @@ let
 
   inherit (nixpkgs) pkgs;
 
+  lib = pkgs.haskell.lib;
+
   haskellPackages = if compiler == "default"
                        then pkgs.haskellPackages
                        else pkgs.haskell.packages.${compiler};
 
   haskellPackages_ = haskellPackages.override {
-    overrides = self: super: with pkgs.haskell.lib; {
+    overrides = self: super: with lib; {
     };
   };
 
-  drv = haskellPackages_.callPackage ./default.nix {};
+  drv = lib.doBenchmark (haskellPackages_.callPackage ./default.nix {});
 
 in
 
