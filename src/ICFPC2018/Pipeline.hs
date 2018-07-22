@@ -52,5 +52,5 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
       | mlenMetric firstIdx lastIdx >= maxFD = Just ((firstIdx, lastIdx), intensions)
       | idx - lastIdx == dir = helper way idx ixs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
-    helper _ lastIdx _ = Just ((firstIdx, lastIdx), intensions)
+    helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
 getNextLine _ = undefined
