@@ -34,6 +34,8 @@ library
                      , mtl
                      , monad-loops
                      , deepseq
+                     , primitive
+                     , transformers
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  BinaryLiterals

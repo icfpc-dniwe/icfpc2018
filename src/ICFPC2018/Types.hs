@@ -3,12 +3,13 @@ module ICFPC2018.Types where
 import Data.Map (Map)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import ICFPC2018.Tensor3 (Tensor3, I3, Axis(..))
+import ICFPC2018.Tensor3 (MTensor3, Tensor3, I3, Axis(..))
 import Linear.V3 (V3(..))
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 
 type Model = Tensor3 Bool
+type MModel s = MTensor3 s Bool
 
 -- each bot has a pool of seed indices
 -- when performing a fission, it gives a subrange of indices to another bot

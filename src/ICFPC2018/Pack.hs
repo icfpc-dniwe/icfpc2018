@@ -6,8 +6,9 @@ module ICFPC2018.Pack
 import Data.Maybe
 import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
+import Control.Monad.ST
+import Control.Monad.Trans.Class
 import Control.Monad.State.Strict
-import Control.Arrow (first)
 
 import ICFPC2018.Tensor3 (I3, Axis(..))
 import qualified ICFPC2018.Tensor3 as T3
@@ -88,31 +89,30 @@ findPath :: Model -> I3 -> I3 -> Maybe [(I3, Command)]
 findPath model start finish = aStar (neighbours model finish) mlenDistance start finish
 
 singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
-singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
-
-data SingleBotModel = SingleBotModel { singleBotPos :: !VolatileCoordinate
-                                     , filledModel :: !Model
-                                     } deriving (Show, Eq)
+singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds
 
 packSingleBotIntensions :: Model -> BotIdx -> I3 -> Intensions -> Trace
-packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
-  m0 = SingleBotModel { singleBotPos = botPos0, filledModel = model0 }
-  (t1, m1) = first concat . (flip runState m0) . mapM packIntension $ xs
+packSingleBotIntensions model0 botIdx botPos0 xs = singleBotCommandsToTrace botIdx $ t1 ++ t2 where
+  (t1, model1, pos1) = runST $ do
+    modelM0 <- T3.thaw model0
+    (t, pos) <- flip runStateT botPos0 $ fmap concat $ mapM (packIntension modelM0) xs
+    model <- T3.freeze modelM0
+    return (t, model, pos)
+    
+  t2 = (map snd $ fromMaybe (error "unable to return to zero") $ findPath model1 pos1 0) ++ [Halt]
 
-  t2 = singleBotCommandsToTrace botIdx
-       $ (map snd $ fromMaybe (error "unable to return to zero") $ findPath (filledModel m1) (singleBotPos m1) 0)
-       ++ [Halt]
-
-  packIntension :: Intension -> State SingleBotModel Trace
-  packIntension = \case
-    FillIdx idx -> do
-      m@(SingleBotModel {..}) <- get
-
-      let lowerVoxel = V3 0 (-1) 0
-          upIdx      = idx + (V3 0 1 0)
-          path       = map snd $ fromMaybe (error "unable move above a block") $ findPath filledModel singleBotPos upIdx
-
-      put $ m { singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
-      return $ singleBotCommandsToTrace botIdx $ path ++ [Fill lowerVoxel]
-
-    FlipGravity -> return $ singleBotCommandsToTrace botIdx [Flip]
+  packIntension :: MModel s -> Intension -> StateT I3 (ST s) [Command]
+  packIntension modelM intension =
+    case intension of
+      FillIdx idx -> do
+        -- Be very cautious there!
+        model <- lift $ T3.unsafeFreeze modelM
+        botPos <- get
+        let lowerVoxel = V3 0 (-1) 0
+            upIdx      = idx + (V3 0 1 0)
+            path       = map snd $ fromMaybe (error "unable move above a block") $ findPath model botPos upIdx
+        -- We force the path to be computed before mutating the model
+        lift $ T3.write modelM (path `seq` idx) True
+        put upIdx
+        return (path ++ [Fill lowerVoxel])
+      FlipGravity -> return [Flip]

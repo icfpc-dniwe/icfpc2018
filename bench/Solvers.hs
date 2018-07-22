@@ -14,7 +14,7 @@ import qualified ICFPC2018.Tensor3 as T3
 
 setupEnv :: IO (Model, ExecState, Trace)
 setupEnv = do
-  modelData <- BL.readFile "tasks/lightning/LA050_tgt.mdl"
+  modelData <- BL.readFile "tasks/lightning/LA100_tgt.mdl"
   let model = runGet getModel modelData
       V3 r _ _ = T3.size model
       state0 = initialState r
