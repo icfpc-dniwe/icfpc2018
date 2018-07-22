@@ -144,9 +144,10 @@ getNextLine _ = undefined
 sliceModel :: Model -> T3.Axis -> [Model]
 sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
   where
-    axisSize T3.X = let (V3 xsz _ _) = T3.size model in xsz
-    axisSize T3.Y = let (V3 _ ysz _) = T3.size model in ysz
-    axisSize T3.Z = let (V3 _ _ zsz) = T3.size model in zsz
+    (V3 xsz ysz zsz) = T3.size model
+    axisSize T3.X = xsz
+    axisSize T3.Y = ysz
+    axisSize T3.Z = zsz
     sz = axisSize axis
     indices = [0, maxFD .. (sz - 2)] ++ [sz]
     boundings = zip (init indices) (tail indices)
