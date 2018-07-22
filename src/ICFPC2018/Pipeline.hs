@@ -22,7 +22,7 @@ secondBot :: BotIdx
 secondBot = 2
 
 pipeline :: Model -> Trace
-pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ haltStep
+pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [haltStep]
   where
     intensions = solve model $ snakeIdx (T3.size model)
     state = case
