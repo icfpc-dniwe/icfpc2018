@@ -1,13 +1,15 @@
 module ICFPC2018.Validation
-  ( validTrace
-  , validLongDifference
+  ( validLongDifference
   , validShortDifference
   , validNearDifference
   , validFarDifference
+  , fillablePoint
   ) where
 
 import Linear.V3 (V3(..))
 
+import ICFPC2018.Tensor3 (I3)
+import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
 import ICFPC2018.Utils
 
@@ -29,17 +31,5 @@ validNearDifference dist = mlen dist <= 2 && clen dist == 1
 validFarDifference :: FarDifference -> Bool
 validFarDifference dist = clen dist <= 30
 
-validCommand :: Command -> Bool
-validCommand Halt = True
-validCommand Wait = True
-validCommand Flip = True
-validCommand (SMove lld) = validLongDifference lld
-validCommand (LMove sld1 sld2) = validShortDifference sld1 && validShortDifference sld2
-validCommand (Fission nd m) = validNearDifference nd && m <= 0xFF
-validCommand (Fill nd) = validNearDifference nd
-validCommand (FusionP nd) = validNearDifference nd
-validCommand (FusionS nd) = validNearDifference nd
-
-validTrace :: Trace -> Bool
-validTrace = all validStep
-  where validStep = all validCommand
+fillablePoint :: Model -> I3 -> Bool
+fillablePoint model = inBox (V3 1 0 1) (T3.size model - 2)

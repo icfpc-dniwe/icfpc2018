@@ -14,6 +14,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import qualified Data.Vector as V
 import Linear.V3 (V3(..))
+import Debug.Trace
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -115,11 +116,11 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       return (state { stateBots = newBots, stateEnergy = stateEnergy + 2 * (clen sld1 + clen sld2 + 2) }, volatiles')
     Fill nd -> do
       let pos = myPos + nd
-      guard $ validNearDifference nd && T3.inBounds stateMatrix pos
+      guard $ validNearDifference nd && fillablePoint stateMatrix pos
       updateRegion VoxelFill (state, volatiles) [pos]
     Void nd -> do
       let pos = myPos + nd
-      guard $ validNearDifference nd && T3.inBounds stateMatrix pos
+      guard $ validNearDifference nd && fillablePoint stateMatrix pos
       updateRegion VoxelVoid (state, volatiles) [pos]
     Fission nd m -> do
       let (childId:childSeeds, parentSeeds) = splitAt (m + 1) $ IS.toAscList $ botSeeds botState
