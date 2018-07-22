@@ -1,7 +1,5 @@
 module ICFPC2018.Utils where
 
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IS
 import Linear.V3 (V3(..))
 
 div1 :: Integral a => a -> a -> a
