@@ -2,6 +2,7 @@ module ICFPC2018.Simulation
   ( ExecState(..)
   , BotState(..)
   , initialState
+  , debugState
   , stepState
   ) where
 
@@ -14,6 +15,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import qualified Data.Vector as V
 import Linear.V3 (V3(..))
+import Debug.Trace
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -62,6 +64,12 @@ initialState r = ExecState { stateEnergy = 0
                               , botSeeds = IS.fromList [2..20]
                               }
         size = V3 r r r
+
+debugState :: ExecState -> Step -> Maybe ExecState
+debugState state step =
+  case stepState state step of
+    Just state' -> Just state'
+    Nothing -> traceShow (state, step) Nothing
 
 stepState :: ExecState -> Step -> Maybe ExecState
 stepState state@(ExecState {..}) step = do

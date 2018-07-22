@@ -17,6 +17,8 @@ import ICFPC2018.Simulation
 import ICFPC2018.Model
 import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
+import ICFPC2018.Pipeline
+import qualified ICFPC2018.Solvers.HighSolver as High
 
 main :: IO ()
 main = defaultMain tests
@@ -27,6 +29,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , simulationTests
   , aStarTests
   , packTests
+  , solverTests
   ]
 
 --
@@ -269,3 +272,17 @@ emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within
 nonEmptySingleIntension :: TestTree
 nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within pathFindingTime $
   \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 2)] state
+
+solverTests :: TestTree
+solverTests = testGroup "Solvers tests"
+  [ solverTest "High" $ \state model -> packSingleBotIntensions (stateMatrix state) 1 0 $ High.solver model
+  , solverTest "Pipeline" $ \_ model -> pipeline model
+  ]
+
+solverTest :: String -> (ExecState -> Model -> Trace) -> TestTree
+solverTest name solver = QC.testProperty (name ++ " solver") $ within (4 * pathFindingTime) $ forAll genModel $ \model ->
+  let V3 r _ _ = T3.size model
+      state0 = initialState r
+      commands = solver state0 model
+  -- in isJust $ foldM debugState state0 $ traceShow (r, length commands) commands
+  in M.size (last commands) == 1
