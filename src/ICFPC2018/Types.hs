@@ -25,7 +25,7 @@ type Difference = V3 Int
 type ShortDifference = Difference
 type LongDifference  = Difference
 type NearDifference  = Difference
-type FarDifference  = Difference
+type FarDifference   = Difference
 
 data HarmonicState = Low | High deriving (Show, Eq)
 
