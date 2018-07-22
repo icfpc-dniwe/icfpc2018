@@ -14,6 +14,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import qualified Data.Vector as V
 import Linear.V3 (V3(..))
+import Debug.Trace
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -91,7 +92,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
     Fill nd -> do
       let pos = myPos + nd
           curr = stateMatrix T3.! pos
-      guard $ validNearDifference nd && T3.inBounds stateMatrix pos
+      guard $ validNearDifference nd && fillablePoint stateMatrix pos
       volatiles' <- addVolatiles state volatiles (S.singleton pos)
       return (state { stateMatrix = T3.update stateMatrix [(pos, True)], stateEnergy = stateEnergy + (if curr then 6 else 12) }, volatiles')
     Fission nd m -> do

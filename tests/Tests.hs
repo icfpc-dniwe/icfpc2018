@@ -18,6 +18,8 @@ import ICFPC2018.Model
 import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
+import Debug.Trace
+
 main :: IO ()
 main = defaultMain tests
 
@@ -68,15 +70,15 @@ tensor3InvalidUpdate = QC.testProperty "Invalid Tensor3 update" $ \(tensor :: Te
 
 genEmptyExecState :: Gen ExecState
 genEmptyExecState = do
-  r <- getSize
-  return $ initialState (r + 1)
+  r <- (+ 3) <$> getSize
+  return $ initialState r
 
 genModel :: Gen Model
 genModel = do
-  r <- getSize
-  let size = fromIntegral (r + 1)
+  r <- (+ 3) <$> getSize
+  let size = fromIntegral r
       empty = T3.create (V.replicate (product size) False) size
-      maybeFilled = boxIndices (V3 1 0 1) (fromIntegral (r - 1))
+      maybeFilled = boxIndices (V3 1 0 1) (fromIntegral (r - 2))
   filled <- filter snd <$> mapM (\i -> (i, ) <$> arbitrary) maybeFilled
   return $ T3.update empty filled
 
@@ -162,8 +164,8 @@ simulationSMoveErrors = testGroup "SMove edge cases"
   , failEmpty "SMove: out of bounds" [[(1, SMove (V3 (-1) 0 0))]]
   , failTest "SMove: collision" [[(1, SMove (V3 1 0 0))], [(1, SMove (V3 0 0 1))]]
   ]
-  where failEmpty name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
-        failTest name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
+  where failEmpty name steps = HU.testCase name $ runEmptyMatrix steps @?= Nothing
+        failTest name steps = HU.testCase name $ runTestMatrix steps @?= Nothing
 
 simulationLMove :: TestTree
 simulationLMove = QC.testProperty "LMove" $ forAll testValues $
@@ -181,8 +183,8 @@ simulationLMoveErrors = testGroup "LMove edge cases"
   , failEmpty "LMove: out of bounds" [[(1, LMove (V3 (-1) 0 0) (V3 1 0 0))]]
   , failTest "LMove: collision" [[(1, LMove (V3 1 0 0) (V3 0 0 1))]]
   ]
-  where failEmpty name steps = HU.testCase name $ isNothing (runEmptyMatrix steps) @?= True
-        failTest name steps = HU.testCase name $ isNothing (runTestMatrix steps) @?= True
+  where failEmpty name steps = HU.testCase name $ runEmptyMatrix steps @?= Nothing
+        failTest name steps = HU.testCase name $ runTestMatrix steps @?= Nothing
 
 --
 -- A* tests
@@ -251,14 +253,19 @@ testSingleBotPackIntensions :: Intensions -> ExecState -> Bool
 testSingleBotPackIntensions intensions state =
   isJust $ foldM stepState state $ packSingleBotIntensions (stateMatrix state) 1 (botPos $ stateBots state M.! 1) intensions
 
+genFillablePoint :: ExecState -> Gen I3
+genFillablePoint state = do
+  let V3 r _ _ = T3.size $ stateMatrix state
+  V3 <$> choose (1, r - 2) <*> choose (0, r - 2) <*> choose (1, r - 2)
+
 emptySingleIntension :: TestTree
 emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within (2 * 10^(6::Int)) $ forAll testValues $
   \(state, p) -> testSingleBotPackIntensions [FillIdx p] state
   where testValues = do
           state <- genEmptyExecState
-          p <- genI3 $ stateMatrix state
+          p <- genFillablePoint state
           return (state, p)
 
 nonEmptySingleIntension :: TestTree
 nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within (2 * 10^(6::Int)) $
-  \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 1)] state
+  \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 2)] state
