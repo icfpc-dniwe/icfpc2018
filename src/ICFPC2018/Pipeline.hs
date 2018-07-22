@@ -43,7 +43,7 @@ pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [ha
     haltStep = M.singleton firstBot Halt
 
 spawnBots :: Step
-spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) secondBot
+spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) 0
 
 firstMove :: Step
 firstMove = M.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
@@ -138,11 +138,14 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
 getNextLine _ = undefined
 
-sliceModel :: Model -> [Model]
-sliceModel model = map (\(begin, end) -> T3.sliceAxis model T3.Y begin (end - 1)) boundings
+sliceModel :: Model -> T3.Axis -> [Model]
+sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
   where
-    V3 _ ySize _ = T3.size model
-    indices = [0, maxFD .. (ySize - 2)] ++ [ySize]
+    axisSize T3.X = let (V3 xsz _ _) = T3.size model in xsz
+    axisSize T3.Y = let (V3 _ ysz _) = T3.size model in ysz
+    axisSize T3.Z = let (V3 _ _ zsz) = T3.size model in zsz
+    sz = axisSize axis
+    indices = [0, maxFD .. (sz - 2)] ++ [sz]
     boundings = zip (init indices) (tail indices)
 
 {-
