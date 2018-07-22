@@ -3,6 +3,7 @@ module ICFPC2018.Validation
   , validLongDifference
   , validShortDifference
   , validNearDifference
+  , validFarDifference
   ) where
 
 import Linear.V3 (V3(..))
