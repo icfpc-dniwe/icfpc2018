@@ -22,18 +22,21 @@ secondBot :: BotIdx
 secondBot = 2
 
 pipeline :: Model -> Trace
-pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero'
+pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ haltStep
   where
     intensions = solve model $ snakeIdx (T3.size model)
-    state = case let (V3 r _ _ ) = T3.size model in foldM stepState (initialState r) [spawnBots, firstMove] of
-      Nothing -> error "pipeline: invalid state (firstMove)"
-      Just st -> st
+    state = case
+      let (V3 r _ _ ) = T3.size model
+      in foldM stepState (initialState r) [spawnBots, firstMove] of
+        Nothing -> error "pipeline: invalid state (firstMove)"
+        Just st -> st
     (state', moves) = moveTrace state intensions
     endStep' = endStep state'
     state'' = case foldM stepState state' endStep' of
       Nothing -> error "pipeline: invalid state (endStep)"
       Just st -> st
     moveToZero' = moveToZero state''
+    haltStep = M.singleton firstBot Halt
 
 spawnBots :: Step
 spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) secondBot
