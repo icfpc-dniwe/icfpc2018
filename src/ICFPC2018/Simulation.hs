@@ -32,6 +32,8 @@ data ExecState = ExecState { stateEnergy :: !Int
                            , stateHarmonics :: !HarmonicState
                            , stateMatrix :: !Model
                            , stateBots :: !(Map BotIdx BotState)
+                           , stateGFillBots = !IntSet
+                           , stateGVoidBots = !IntSet
                            , stateHalted :: !Bool
                            }
                            deriving (Show, Eq)
@@ -48,11 +50,24 @@ data BotState = BotState { botPos :: !I3
                          }
               deriving (Show, Eq)
 
+--
+
+data CornerCommandGraph = Gr BotIdx ()
+
+cornerCommandGraph :: [(BotIdx, VolatileCoordinate)] -> [(BotIdx, VolatileCoordinate)] -> CornerCommandGraph
+cornerCommandGraph srcCorners dstCorners = G.mkGraph nodes edges where
+  nodes = zip (snd <$> srcCorners) $ fst <$> srcCorners
+  edges = map (\s,d -> (snd s, snd d, ())) $ zip srcCorners dstCorners
+
+--
+
 initialState :: Model -> ExecState
 initialState model = ExecState { stateEnergy = 0
                                , stateHarmonics = Low
                                , stateMatrix = model
                                , stateBots = M.singleton 1 initialBot
+                               , stateGFillProcessedBots = IS.empty
+                               , stateGVoidProcessedBots = IS.empty
                                , stateHalted = False
                                }
   where initialBot = BotState { botPos = 0
@@ -70,6 +85,31 @@ stepState state@(ExecState {..}) step = do
   (state2, _) <- foldM (stepBot botPositions step) (state1, M.keysSet botPositions) $ M.toList step
   -- FIXME: check connectivity
   return state2
+
+botsPerformingCommand :: Step -> (Command -> Bool) -> [BotIdx]
+botsPerformingCommand step pr = M.keys $ filter pr step
+
+botsPerformingGFill :: Step -> [BotIdx]
+botsPerformingGFill step = botsPerformingGFill step (
+  \cmd -> case cmd of
+    (GFill _ _) -> True
+    _           -> False
+  )
+
+botsPerformingGVoid :: Step -> [BotIdx]
+botsPerformingGVoid step = botsPerformingGFill step (
+  \cmd -> case cmd of
+    (GVoid _ _) -> True
+    _           -> False
+  )
+
+groupCommandRegion :: [VolatileCoordinate] -> BoundingBox
+groupCommandRegion corners = (bbmin, bbmax)
+  bbmin = foldr1 (\(V3 x0 y0 z0) (V3 x1 y1 z1) -> (V3 (min x0 x1) (min y0 y1) (min z0 z1))) corners
+  bbmax = foldr1 (\(V3 x0 y0 z0) (V3 x1 y1 z1) -> (V3 (max x0 x1) (max y0 y1) (max z0 z1))) corners
+
+groupCommandRegionValid :: BoundingBox -> [VolatileCoordinate] -> Bool
+groupCommandRegionValid (b0,b1) corners = all (flip . elem $ corners) [b0, b1] 
 
 stepBot :: BotPositions -> Step -> (ExecState, Set VolatileCoordinate) -> (BotIdx, Command) -> Maybe (ExecState, Set VolatileCoordinate)
 stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
@@ -97,6 +137,12 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       guard $ validNearDifference nd && T3.inBounds stateMatrix pos
       volatiles' <- addVolatiles state volatiles (S.singleton pos)
       return (state { stateMatrix = T3.update stateMatrix [(pos, True)], stateEnergy = stateEnergy + (if curr then 6 else 12) }, volatiles')
+    Void nd -> do
+      let pos = myPos + nd
+          curr = stateMatrix T3.! pos
+      guard $ validNearDifference nd && T3.inBounds stateMatrix pos
+      volatiles' <- addVolatiles state volatiles (S.singleton pos)
+      return (state { stateMatrix = T3.update stateMatrix [(pos, False)], stateEnergy = stateEnergy + (if curr then -12 else 3) }, volatiles')
     Fission nd m -> do
       let (childId:childSeeds, parentSeeds) = splitAt (m + 1) $ IS.toAscList $ botSeeds botState
           childPos = myPos + nd
@@ -120,6 +166,27 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
       return (state { stateBots = newBots, stateEnergy = stateEnergy - 24 }, volatiles)
     -- Handled in FusionP
     FusionS _ -> return (state, volatiles)
+    GFill nd fd -> do
+      let allBots = botsPerformingGFill step
+      let allCommands = (step M.!) <$> allBots
+      guard $ all (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
+
+      let botPositions = map botPos $ (flip M.lookup) <$> allBots
+      
+      let srcCorners = map (\((GFill nd' _), pos) -> pos + nd') $ zip allCommands botPositions
+      let dstCorners = map (\((GFill nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions
+      guard $ all (\c -> T3.inBounds stateMatrix childPos) srcCorners
+      guard $ all (\c -> T3.inBounds stateMatrix childPos) dstCorners 
+
+      let commandGraph = cornerCommandGraph srcCorners dstCorners
+      let commandCycles = cycles commandGraph
+      guard $ all (\x -> length x `mod` 2 == 0) commandCycles
+
+      gcRegions = groupCommandRegion <$> commandCycles
+      guard $ all id $ (groupCommandRegionValid bbox) <$> gcRegions
+
+
+
   where botState = stateBots M.! botIdx
         myPos = botPos botState
 

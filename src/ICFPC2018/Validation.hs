@@ -25,6 +25,9 @@ validShortDifference = validLinearDifference maxSLD
 validNearDifference :: NearDifference -> Bool
 validNearDifference dist = mlen dist <= 2 && clen dist == 1
 
+validFarDifference :: FarDifference -> Bool
+validFarDifference dist = clen dist <= 30
+
 validCommand :: Command -> Bool
 validCommand Halt = True
 validCommand Wait = True
