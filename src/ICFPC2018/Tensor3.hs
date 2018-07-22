@@ -15,6 +15,7 @@ module ICFPC2018.Tensor3
   , slice
   , sliceAxis
   , inBounds
+  , printTensor
   ) where
 
 import Prelude hiding (replicate)
@@ -40,7 +41,30 @@ data T3View a = T3View
                , farthestIdx :: !I3
                , sizeView :: !Tensor3Size
                } deriving (Show, Eq)
+
+instance Foldable T3View where
+  foldMap = error "instance Foldable T3View: implement me!"
+
+instance Functor T3View where
+  fmap f t = t { tensor = fmap f (tensor t)}
+
+instance Traversable T3View where
+  traverse f t = (\tensor' -> t { tensor = tensor'}) <$> (traverse f (tensor t))
+
 data Tensor3 a = Tensor !(T3 a) | View !(T3View a) deriving (Show, Eq)
+
+instance Foldable Tensor3 where
+  foldMap f (Tensor t) = foldMap f t
+  foldMap f (View v)   = foldMap f v
+
+instance Functor Tensor3 where
+  fmap f (Tensor t) = Tensor (fmap f t)
+  fmap f (View v)   = View   (fmap f v)
+
+instance Traversable Tensor3 where
+  traverse f (Tensor t) = Tensor <$> (traverse f t)
+  traverse f (View v)   = View   <$> (traverse f v)
+
 
 linearIdx :: Tensor3Size -> I3 -> Int
 linearIdx (V3 _ ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
@@ -171,3 +195,12 @@ instance Functor T3 where
 
 instance Traversable T3 where
   traverse fun (T3 v sz) = T3 <$> traverse fun v <*> pure sz
+
+
+printTensor :: (Show a) => Tensor3 a -> IO ()
+printTensor t = mapM_ (\j -> printLayer j >> hr) (reverse [0..(h-1)]) where
+  (V3 w h d) = size t
+  hr = putStrLn $ take w . repeat $ '-'
+
+  printLayer j  = mapM_ (printLine j) [0..(d-1)]
+  printLine j k = putStrLn (concatMap (\i -> show (t ! (V3 i j k))) [0..(w-1)])
