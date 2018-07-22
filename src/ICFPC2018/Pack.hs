@@ -3,10 +3,9 @@ module ICFPC2018.Pack
   , packSingleBotIntensions
   ) where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
-import Linear.Vector ((*^))
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 
@@ -33,32 +32,46 @@ moveTowards from to | to > from + maxLLD = (maxLLD, from + maxLLD)
                     | to < from - maxLLD = (-maxLLD, from - maxLLD)
                     | otherwise      = (to - from, to)
 
+linearDifferences :: Int -> [Difference]
+linearDifferences maxLen = [ mkLinearDifference axis c
+                           | axis <- [minBound..]
+                           , c <- [-maxLen..maxLen]
+                           , c /= 0
+                           ]
+
+longMoves :: [LongDifference]
+longMoves = linearDifferences maxLLD
+
+shortMoves :: [(ShortDifference, ShortDifference)]
+shortMoves = [ (mkLinearDifference axis1 c1, mkLinearDifference axis2 c2)
+             | axis1 <- [minBound..]
+             , axis2 <- [minBound..]
+             , c1 <- [-maxSLD..maxSLD]
+             , c2 <- [-maxSLD..maxSLD]
+             , c1 /= 0
+             , c2 /= 0
+             , axis1 /= axis2
+             ]
 
 neighbours :: Model -> I3 -> [(I3, Command)]
-neighbours = result where
+neighbours model p = sSteps ++ lSteps
+  where sSteps = mapMaybe validSMove longMoves
+        lSteps = mapMaybe validLMove shortMoves
 
-  dirs :: [I3]
-  dirs = [
-      V3 1    0    0
-    , V3 0    1    0
-    , V3 0    0    1
-    , V3 (-1) 0    0
-    , V3 0    (-1) 0
-    , V3 0    0    (-1)
-    ]
-
-  genSLN :: Model -> I3 -> Int -> I3 -> [I3]
-  genSLN m c l n
-    = takeWhile (\i -> T3.inBounds m i && (not $ m T3.! i))
-    . map (\j -> c + j *^ n)
-    $ [1..l]
-
-  genSL :: Model -> I3 -> Int -> [I3]
-  genSL m c l = concatMap (genSLN m c l) dirs
-
-  result m c
-    =   map (\c' -> (c', SMove (c' - c))) (genSL m c 15)
-    ++  concatMap (\c' -> map (\c'' -> (c'', LMove (c' - c) (c'' - c')))  (genSL m c' 5)) (genSL m c 5)
+        validSMove d
+          | T3.inBounds model newP &&
+            all (not . (model T3.!)) (linearPath p d)
+          = Just (newP, SMove d)
+          | otherwise = Nothing
+          where newP = p + d
+        validLMove (d1, d2)
+          | T3.inBounds model newP1 &&
+            T3.inBounds model newP2 &&
+            all (not . (model T3.!)) (linearPath p d1 ++ linearPath newP1 d2)
+          = Just (newP2, LMove d1 d2)
+          | otherwise = Nothing
+          where newP1 = p + d1
+                newP2 = newP1 + d2
 
 singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
 singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
@@ -79,17 +92,13 @@ packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
   packIntension :: Intension -> State SingleBotModel Trace
   packIntension = \case
     FillIdx idx -> do
-      m  <- get
+      m@(SingleBotModel {..}) <- get
 
       let lowerVoxel = V3 0 (-1) 0
-      let upIdx      = idx + (V3 0 1 0)
-      let m'         = m {singleBotPos = upIdx}
+          upIdx      = idx + (V3 0 1 0)
+          path       = map snd $ fromMaybe (error "unable move above a block") $ aStar (neighbours filledModel) mlenDistance singleBotPos upIdx
 
-      put m'
-
-      -- return $ singleBotCommandsToTrace botIdx $ packMove singleBotPos upIdx ++ [Fill lowerVoxel]
-      return $ singleBotCommandsToTrace botIdx
-        $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenDistance (singleBotPos m') upIdx)
-        ++ [Fill lowerVoxel]
+      put $ m {singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
+      return $ singleBotCommandsToTrace botIdx $ path ++ [Fill lowerVoxel]
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
