@@ -248,13 +248,13 @@ decomposeModel m
         let t = case b of
                   False -> VSEmpty
                   True  -> if (y == 0) then VSGrounded else VSFloating
-        put (floodFill s idx (Right t))
+        put (floodFill idx (Right t) s)
         return $ Just (idx, t)
       _ -> return Nothing
 
 
-floodFill :: forall a. (Eq a) => Tensor3 a -> I3 -> a -> Tensor3 a
-floodFill m0 idx0 v = execState (step idx0) m0 where
+floodFill :: forall a. (Eq a) => I3 -> a -> Tensor3 a -> Tensor3 a
+floodFill idx0 v m0 = execState (step idx0) m0 where
   sz = T3.size m0
 
   step :: I3 -> State (Tensor3 a) ()
@@ -265,7 +265,7 @@ floodFill m0 idx0 v = execState (step idx0) m0 where
       mapM_ (\idx' -> get >>= \m' -> when (m' T3.! idx' == v0) $ step idx') (adjacent idx)
 
   adjacent :: I3 -> [I3]
-  adjacent idx = filter (inBox sz) . map (idx+) $ [
+  adjacent idx = filter (inSizeBounds sz) . map (idx+) $ [
       (V3 1 0 0), -(V3 1 0 0)
     , (V3 0 1 0), -(V3 0 1 0)
     , (V3 0 0 1), -(V3 0 0 1)
