@@ -89,13 +89,17 @@ mergeCommands commands = getZipList $ (\m v -> M.insert secondBot v m) <$> (M.si
                       else ZipList $ secondCommands ++ (repeat Wait)
 
 fillLine :: ExecState -> Step
-fillLine state = M.fromList [(firstBot, GFill beginPos endPos), (secondBot, GFill endPos beginPos)]
+fillLine state = M.fromList [(firstBot, firstCommand), (secondBot, secondCommand)]
   where
     bots = stateBots state
     firstPos = botPos $ bots M.! firstBot
     secondPos = botPos $ bots M.! secondBot
     beginPos = firstPos - (V3 0 1 0)
     endPos = secondPos - (V3 0 1 (-1))
+    firstCommand | beginPos == endPos = Fill beginPos
+                 | otherwise = GFill beginPos endPos
+    secondCommand | beginPos == endPos = Wait
+                  | otherwise = GFill endPos beginPos
 
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
