@@ -205,16 +205,15 @@ immediateAStar :: Model -> I3 -> I3 -> Maybe [(I3, I3)]
 immediateAStar model = aStar (immediateNeighbours model) (\a b -> mlen (a - b))
 
 checkPath :: Model -> I3 -> I3 -> [(I3, I3)] -> Bool
-checkPath _ _ _ [] = False
-checkPath model start finish path0@((first, _):_)
-  | first /= start = False
-  | otherwise = not (model T3.! start) && go path0
-  where go [] = error "checkPath: impossible"
-        go [(current, step)] = current + step == finish
-        go ((current, step):path@((next, _):_)) = isNeighbour && not obstructed && followsSteps && go path
-          where isNeighbour = next `elem` map fst (immediateNeighbours model current)
+checkPath _ start finish [] = start == finish
+checkPath model start finish path0@(_:_)
+  | otherwise = not (model T3.! start) && go start path0
+  where go current [] = current == finish
+        go current ((pathCurrent, step):path) = isNeighbour && not obstructed && sameCurrent && go next path
+          where next = current + step
+                isNeighbour = next `elem` map fst (immediateNeighbours model current)
                 obstructed = model T3.! next
-                followsSteps = current + step == next
+                sameCurrent = current == pathCurrent
 
 aStarTests :: TestTree
 aStarTests = testGroup "A* tests" [aStarRandom, aStarGuaranteed]
