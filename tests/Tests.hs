@@ -1,15 +1,19 @@
+{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import Control.Monad
 import Data.Maybe
+import Data.Vector.Unboxed (Unbox)
+import qualified Data.Vector.Unboxed as V
 import qualified Data.IntSet as IS
-import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
 import Test.ChasingBottoms
+-- import Data.List (dropWhileEnd)
+-- import Text.Heredoc
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -18,6 +22,8 @@ import ICFPC2018.Simulation
 import ICFPC2018.Model
 import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
+import ICFPC2018.Pipeline
+import qualified ICFPC2018.Solvers.HighSolver as High
 
 main :: IO ()
 main = defaultMain tests
@@ -28,6 +34,8 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , simulationTests
   , aStarTests
   , packTests
+  , solverTests
+  --, floodFillTests
   ]
 
 --
@@ -37,7 +45,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
 tensor3Tests :: TestTree
 tensor3Tests = testGroup "Tensor3 tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
 
-instance Arbitrary a => Arbitrary (Tensor3 a) where
+instance (Unbox a, Arbitrary a) => Arbitrary (Tensor3 a) where
   arbitrary = do
     size <- V3 <$> getSize <*> getSize <*> getSize
     values <- vectorOf (product size) arbitrary
@@ -87,7 +95,7 @@ instance Arbitrary ExecState where
     let V3 r _ _ = T3.size m
     return $ (initialState r) { stateMatrix = m }
 
-instance Arbitrary Axis where
+instance Arbitrary T3.Axis where
   arbitrary = arbitraryBoundedEnum
 
 genLinearDifference :: Int -> Gen I3
@@ -129,7 +137,7 @@ testModel = T3.create
               ]) (V3 4 4 4)
 
 runOnMatrix :: Model -> ExecState -> [[(Int, Command)]] -> Maybe ExecState
-runOnMatrix matrix initState = foldM {-stepState-}debugState (initState { stateMatrix = matrix }) . map M.fromList
+runOnMatrix matrix initState = foldM stepState (initState { stateMatrix = matrix }) . map M.fromList
 
 runOnMatrix' :: Model -> [[(Int, Command)]] -> Maybe ExecState
 runOnMatrix' matrix = runOnMatrix matrix $ initialState r where
@@ -208,9 +216,9 @@ initialGFillBots R1B2P  = genBot <$> [V3 0 0 0, V3 0 0 4]
 initialGFillBots R1B4P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4]
 initialGFillBots R1B8P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4]
 initialGFillBots R2B4P  = genBot <$> [V3 0 0 0, V3 0 0 4, V3 4 3 0, V3 0 3 0]
-initialGFillBots R2B8P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 5 1 0, V3 5 5 0, V3 5 5 1, V3 5 1 5]
+initialGFillBots R2B8P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 5 1 0, V3 5 5 0, V3 5 5 5, V3 5 1 5]
 initialGFillBots R2B16P = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4,
-                                      V3 6 6 6, V3 9 6 6, V3 9 6 9, V3 6 6 9, V3 6 9 6, V3 9 9 6, V3 6 6 6, V3 9 6 6]
+                                      V3 6 6 6, V3 9 6 6, V3 9 6 9, V3 6 6 9, V3 6 9 6, V3 9 9 6, V3 9 9 9, V3 6 9 9]
 initialGFillBots R1B2F  = genBot <$> [V3 1 0 0, V3 0 0 4]
 initialGFillBots R1B4F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 3, V3 0 0 4]
 initialGFillBots R1B8F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 2 0, V3 4 4 0, V3 4 5 4, V3 0 4 4]
@@ -228,21 +236,21 @@ genGFillStep R1B2P  = genGFillStep' [GFill (V3   0    0    1 ) (V3   0    0    2
                                      GFill (V3   0    0  (-1)) (V3   0    0  (-2))
                                     ]
 genGFillStep R1B4P  = genGFillStep' [GFill (V3   0    1    0 ) (V3   4    0    4 ),
-                                     GFill (V3   4    1    0 ) (V3 (-4)   0    4 ),
-                                     GFill (V3   4    1    4 ) (V3 (-4)   0  (-4)),
-                                     GFill (V3   0    1    4 ) (V3   4    0  (-4))
+                                     GFill (V3   0    1    0 ) (V3 (-4)   0    4 ),
+                                     GFill (V3   0    1    0 ) (V3 (-4)   0  (-4)),
+                                     GFill (V3   0    1    0 ) (V3   4    0  (-4))
                                     ]
-genGFillStep R1B8P  = genGFillStep' [GFill (V3   1    1    1 ) (V3   2    2    2 ),
-                                     GFill (V3 (-1)   1    1 ) (V3 (-2)   2    2 ),
-                                     GFill (V3 (-1)   1  (-1)) (V3 (-2)   2  (-2)),
-                                     GFill (V3   1    1  (-1)) (V3   2    2  (-2)),
-                                     GFill (V3   1  (-1)   1 ) (V3   2  (-2)   2 ),
-                                     GFill (V3 (-1) (-1)   1 ) (V3 (-2) (-2)   2 ),
-                                     GFill (V3 (-1) (-1) (-1)) (V3 (-2) (-2) (-2)),
-                                     GFill (V3   1  (-1) (-1)) (V3   2  (-2) (-2))
+genGFillStep R1B8P  = genGFillStep' [GFill (V3   1    0    1 ) (V3   2    4    2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2)   4    2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2)   4  (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2    4  (-2)),
+                                     GFill (V3   1    0    1 ) (V3   2  (-4)   2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2) (-4)   2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2) (-4) (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2  (-4) (-2))
                                     ]
 genGFillStep R2B4P  = genGFillStep' [GFill (V3   0    1    0 ) (V3   0    0    4 ),
-                                     GFill (V3   0    1    4 ) (V3   0    0  (-4)),
+                                     GFill (V3   0    1    0 ) (V3   0    0  (-4)),
                                      GFill (V3   0  (-1)   0 ) (V3 (-4)   0    0 ),
                                      GFill (V3   0  (-1)   0 ) (V3   4    0    0 )
                                     ]
@@ -250,12 +258,29 @@ genGFillStep R2B8P  = genGFillStep' [GFill (V3   1    0    1 ) (V3   2    0    2
                                      GFill (V3 (-1)   0    1 ) (V3 (-2)   0    2 ),
                                      GFill (V3 (-1)   0  (-1)) (V3 (-2)   0  (-2)),
                                      GFill (V3   1    0  (-1)) (V3   2    0  (-2)),
-                                     GFill (V3   1    0    1 ) (V3   2    0    2 ),
-                                     GFill (V3 (-1)   0    1 ) (V3 (-2)   0    2 ),
-                                     GFill (V3 (-1)   0  (-1)) (V3 (-2)   0  (-2)),
-                                     GFill (V3   1    0  (-1)) (V3   2    0  (-2))
+                                     GFill (V3   1    0    0 ) (V3   0    4    5 ),
+                                     GFill (V3   1    0    0 ) (V3   0  (-4)   5 ),
+                                     GFill (V3   1    0    0 ) (V3   0  (-4) (-5)),
+                                     GFill (V3   1    0    0 ) (V3   0    4  (-5))
                                     ]
-genGFillStep R2B16P = M.union (genGFillStep R1B8P) (genGFillStep R1B8P)
+genGFillStep R2B16P = genGFillStep' [GFill (V3   1    0    1 ) (V3   2    4    2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2)   4    2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2)   4  (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2    4  (-2)),
+                                     GFill (V3   1    0    1 ) (V3   2  (-4)   2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2) (-4)   2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2) (-4) (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2  (-4) (-2)),
+
+                                     GFill (V3   1    0    1 ) (V3   1    3    1 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-1)   3    1 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-1)   3  (-1)),
+                                     GFill (V3   1    0  (-1)) (V3   1    3  (-1)),
+                                     GFill (V3   1    0    1 ) (V3   1  (-3)   1 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-1) (-3)   1 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-1) (-3) (-1)),
+                                     GFill (V3   1    0  (-1)) (V3   1  (-3) (-1))
+                                    ]
 genGFillStep R1B2F  = genGFillStep R1B2P
 genGFillStep R1B4F  = genGFillStep R1B4P
 genGFillStep R1B8F  = genGFillStep R1B8P
@@ -279,8 +304,8 @@ simulationGFillTests :: TestTree
 simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests where
   failEmpty name bots steps = HU.testCase name $ runEmptyMatrix (initialGFillState bots) steps @?= Nothing
   succEmpty name bots steps = HU.testCase name $ isJust (runEmptyMatrix (initialGFillState bots) steps) @?= True
-  failCases = [{-R1B2F, R1B4F, R1B8F, R2B4F, R2B8F, R2B16F, R1B7F-}]
-  succCases = [R1B2P{-, R1B4P, R1B8P, R2B4P, R2B8P, R2B16P-}]
+  failCases = [R1B2F, R1B4F, R1B8F, R2B4F, R2B8F, R2B16F, R1B7F]
+  succCases = [R1B2P, R1B4P, R1B8P, R2B4P, R2B8P, R2B16P]
   failBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) failCases
   succBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) succCases
   failTests = map (\(bots, gen) -> failEmpty ("GFill: " ++ show gen) bots [M.toList $ genGFillStep gen]) $ zip failBots failCases
@@ -371,3 +396,85 @@ emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within
 nonEmptySingleIntension :: TestTree
 nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within pathFindingTime $
   \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 2)] state
+
+solverTests :: TestTree
+solverTests = testGroup "Solvers tests"
+  [ solverTest "High" $ \state model -> packSingleBotIntensions (stateMatrix state) 1 0 $ High.solver model
+  , solverTest "Pipeline" $ \_ model -> pipeline model
+  ]
+
+solverTest :: String -> (ExecState -> Model -> Trace) -> TestTree
+solverTest name solver = QC.testProperty (name ++ " solver") $ within (4 * pathFindingTime) $ forAll genModel $ \model ->
+  let V3 r _ _ = T3.size model
+      state0 = initialState r
+      commands = solver state0 model
+  -- in isJust $ foldM debugState state0 $ traceShow (r, length commands) commands
+  in M.size (last commands) == 1
+
+{-
+floodFillTests :: TestTree
+floodFillTests = testGroup "FloodFill Tests" [
+    mkFloodFillTest "t1"
+      [here|
+        000
+        000
+        000|]
+      [(V3 0 0 0, 1 :: Int)]
+      [here|
+        111
+        111
+        111|]
+
+  , mkFloodFillTest "t2"
+      [here|
+        01000
+        01010
+        01010
+        01010
+        00010|]
+      [ (V3 0 0 0, 2 :: Int)
+      , (V3 1 0 0, 3 :: Int)
+      , (V3 3 0 1, 4 :: Int)]
+      [here|
+        23222
+        23242
+        23242
+        23242
+        22242|]
+
+  , mkFloodFillTest "t3"
+      [here|
+        00100100
+        01001001
+        10010010
+        00100100
+        01001001
+        10010010
+        00100100
+        01001000|]
+      [ (V3 7 0 0, 1 :: Int)
+      , (V3 7 0 0, 0 :: Int)
+      , (V3 7 0 0, 1 :: Int)
+      , (V3 7 0 0, 2 :: Int)]
+      [here|
+        00222222
+        02222222
+        22222222
+        22222222
+        22222222
+        22222220
+        22222200
+        22222000|]
+  ]
+
+
+mkFloodFillTest :: (Read a, Show a, Eq a) => String -> String -> [(I3, a)] -> String -> TestTree
+mkFloodFillTest name s fs s' = QC.testProperty name
+  $ (== cleanup s')
+  . cleanup
+  . T3.showY 0
+  . (\m -> foldl (\m' (idx, v) -> floodFill idx v m') m fs)
+  . fmap (read . pure)
+  $ T3.scanY (cleanup s) where
+  cleanup = dropWhileEnd (== '\n') . dropWhile (=='\n') . filter (/= ' ')
+-}

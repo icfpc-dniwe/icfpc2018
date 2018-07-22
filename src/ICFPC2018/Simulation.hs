@@ -2,6 +2,7 @@ module ICFPC2018.Simulation
   ( ExecState(..)
   , BotState(..)
   , initialState
+  , debugState
   , stepState
   ) where
 
@@ -12,8 +13,11 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as V
 import Linear.V3 (V3(..))
+import Debug.Trace
+import GHC.Generics (Generic)
+import Control.DeepSeq
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -31,7 +35,9 @@ data ExecState = ExecState { stateEnergy :: !Int
                            , stateGVoidDone :: !Bool
                            , stateHalted :: !Bool
                            }
-                           deriving (Show, Eq)
+                           deriving (Show, Eq, Generic)
+
+instance NFData ExecState
 
 type SeedsSet = IntSet
 
@@ -43,11 +49,13 @@ data FusionStatus = FusionMaster | FusionSlave
 data BotState = BotState { botPos :: !I3
                          , botSeeds :: !SeedsSet
                          }
-              deriving (Show, Eq)
+              deriving (Show, Eq, Generic)
 
-data SilulationVoxelAction = VoxelFill | VoxelVoid
+instance NFData BotState
+
+data SimulationVoxelAction = VoxelFill | VoxelVoid
                            deriving (Show, Eq)
-actionToBool :: SilulationVoxelAction -> Bool
+actionToBool :: SimulationVoxelAction -> Bool
 actionToBool VoxelFill = True
 actionToBool VoxelVoid = False
 
@@ -64,6 +72,12 @@ initialState r = ExecState { stateEnergy = 0
                               , botSeeds = IS.fromList [2..20]
                               }
         size = V3 r r r
+
+debugState :: ExecState -> Step -> Maybe ExecState
+debugState state step =
+  case stepState state step of
+    Just state' -> Just state'
+    Nothing -> traceShow (state, step) Nothing
 
 stepState :: ExecState -> Step -> Maybe ExecState
 stepState state@(ExecState {..}) step = do
@@ -177,7 +191,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
         guard $ not $ any id $ concat $ map (\pos -> map (\(b0,b1) -> inBox b0 b1 pos) distinctRegions) botPositions'
 
         (state', volatiles') <- foldM (updateRegion VoxelFill) (state, volatiles) $ map (\(b0,b1) -> boxIndices b0 b1) distinctRegions
-        return (state' { stateGVoidDone = True }, volatiles')
+        return (state' { stateGFillDone = True }, volatiles')
       else do
         return (state, volatiles)
     GVoid _ _ -> do
@@ -209,6 +223,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
                                               VoxelFill -> if occupied then 6 else 12
                                               VoxelVoid -> if occupied then -12 else 3
         updateRegion action (state'', volatiles'') voxels = do
+          --traceM ("updateRegion: add volatiles: " ++ show (state'', volatiles''))
           volatiles' <- addVolatiles volatiles'' (S.fromList voxels)
           let energyDelta = sum $ (updateEnergyDelta action) <$> (stateMatrix T3.!) <$> voxels
           return (state'' {

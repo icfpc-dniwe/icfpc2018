@@ -33,13 +33,18 @@ library
                      , pqueue
                      , mtl
                      , monad-loops
+                     , deepseq
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  BinaryLiterals
                      , LambdaCase
                      , RecordWildCards
                      , ScopedTypeVariables
-  ghc-options:         -Wall
+                     , DeriveGeneric
+                     , DeriveFunctor
+                     , DeriveFoldable
+                     , DeriveTraversable
+  ghc-options:         -Wall -fprof-auto
 
 executable solver
   main-is:             Solver.hs
@@ -50,7 +55,7 @@ executable solver
                      , linear
   hs-source-dirs:      exe
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -fprof-auto
 
 test-suite tests
   main-is:             Tests.hs
@@ -63,6 +68,7 @@ test-suite tests
                      , vector
                      , containers
                      , linear
+                     , heredoc
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   default-language:    Haskell2010
@@ -70,4 +76,17 @@ test-suite tests
                      , LambdaCase
                      , RecordWildCards
                      , TupleSections
-  ghc-options:         -Wall
+  ghc-options:         -Wall -threaded -fprof-auto
+
+benchmark lightning-solvers
+  main-is:             Solvers.hs
+  build-depends:       base >=4.10
+                     , icfpc2018
+                     , criterion
+                     , bytestring
+                     , binary
+                     , linear
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  default-language:    Haskell2010
+  ghc-options:         -Wall -threaded -fprof-auto

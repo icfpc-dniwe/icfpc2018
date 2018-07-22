@@ -1,10 +1,17 @@
-module ICFPC2018.Pipeline where
+module ICFPC2018.Pipeline
+  ( pipeline
+  , moveToZero
+  , sliceModel
+  , bboxHeuristics
+  ) where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
 import Control.Applicative
 import Control.Monad
+import Foreign.Marshal.Utils
+import Data.Monoid (Sum(..))
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -39,7 +46,7 @@ pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [ha
     haltStep = M.singleton firstBot Halt
 
 spawnBots :: Step
-spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) secondBot
+spawnBots = M.singleton firstBot $ Fission (V3 1 0 0) 0
 
 firstMove :: Step
 firstMove = M.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
@@ -55,7 +62,10 @@ moveTrace state intensions = helper state intensions []
       Just st' -> st'
     helper st ints tr = case mergedMove st ints of
       Nothing -> (st, tr)
-      Just (curTrace, ints') -> helper (proceedState st curTrace) ints' (tr ++ curTrace)
+      Just (curTrace, ints') -> helper (proceedState st' fillMove) ints' (tr ++ curTrace ++ fillMove)
+        where
+          st' = proceedState st curTrace
+          fillMove = [fillLine st']
 
 moveBots :: ExecState -> Intensions -> Maybe (Map BotIdx [Command], Intensions)
 moveBots state intensions = case getNextLine intensions of
@@ -82,13 +92,17 @@ mergeCommands commands = getZipList $ (\m v -> M.insert secondBot v m) <$> (M.si
                       else ZipList $ secondCommands ++ (repeat Wait)
 
 fillLine :: ExecState -> Step
-fillLine state = M.fromList [(firstBot, GFill beginPos endPos), (secondBot, GFill endPos beginPos)]
+fillLine state = M.fromList [(firstBot, firstCommand), (secondBot, secondCommand)]
   where
     bots = stateBots state
     firstPos = botPos $ bots M.! firstBot
     secondPos = botPos $ bots M.! secondBot
     beginPos = firstPos - (V3 0 1 0)
     endPos = secondPos - (V3 0 1 (-1))
+    firstCommand | beginPos == endPos = Fill beginPos
+                 | otherwise = GFill beginPos endPos
+    secondCommand | beginPos == endPos = Wait
+                  | otherwise = GFill endPos beginPos
 
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
@@ -108,23 +122,6 @@ moveToZero state = M.singleton firstBot <$> commands
     bots = stateBots state
     pos = botPos $ bots M.! firstBot
     commands = packMove pos 0
-{-
-sliceModel :: Model -> Int -> [T3.BoundingBox]
-sliceModel m0 numBots = undefined
-  where
-    modelBox = T3.boundingBox m0 id
-    bottomLine = case modelBox of
-      (V3 x1 y1 z1, V3 x2 y2 z2) -> if (x2 - x1) > (z2 - z1)
-                                    then (X, x1, x2)
-                                    else (Z, z1, z2)
-    slice (X, from, to) = undefined
-    slice (Z, from, to) = undefined
-
-    mergeTraces :: [Trace] -> Trace
-    mergeTraces traces = foldr helper $ zip [1..] traces
-      where
-        helper = undefined
--}
 
 solve :: Model -> [I3] -> Intensions
 solve model idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
@@ -143,3 +140,25 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
 getNextLine _ = undefined
+
+sliceModel :: Model -> T3.Axis -> [Model]
+sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
+  where
+    axisSize T3.X = let (V3 xsz _ _) = T3.size model in xsz
+    axisSize T3.Y = let (V3 _ ysz _) = T3.size model in ysz
+    axisSize T3.Z = let (V3 _ _ zsz) = T3.size model in zsz
+    sz = axisSize axis
+    indices = [0, maxFD .. (sz - 2)] ++ [sz]
+    boundings = zip (init indices) (tail indices)
+
+bboxHeuristics :: Model -> Double
+bboxHeuristics model = sm / sz
+  where
+    bbox = T3.boundingBox model id
+    subModel = T3.slice model bbox
+    modelSum :: Int
+    modelSum = T3.nonzero subModel
+    sm :: Double
+    sm = fromIntegral $ modelSum
+    sz :: Double
+    sz = fromIntegral $ product $ T3.size subModel

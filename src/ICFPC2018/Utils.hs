@@ -1,7 +1,5 @@
 module ICFPC2018.Utils where
 
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IS
 import Linear.V3 (V3(..))
 
 div1 :: Integral a => a -> a -> a
@@ -83,3 +81,9 @@ getBox :: Ord a => V3 a -> V3 a -> (V3 a, V3 a)
 getBox (V3 x0 y0 z0) (V3 x1 y1 z1) = (b0, b1) where
   b0 = V3 (min x0 x1) (min y0 y1) (min z0 z1)
   b1 = V3 (max x0 x1) (max y0 y1) (max z0 z1)
+
+splitPlanar :: (Eq a, Num a) => V3 a -> Maybe (V3 a, V3 a)
+splitPlanar (V3 0 y z) = Just (V3 0 y 0, V3 0 0 z)
+splitPlanar (V3 x 0 z) = Just (V3 x 0 0, V3 0 0 z)
+splitPlanar (V3 x y 0) = Just (V3 x 0 0, V3 0 y 0)
+splitPlanar _ = Nothing
