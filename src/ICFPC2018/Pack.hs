@@ -6,7 +6,6 @@ module ICFPC2018.Pack
 import Data.Maybe
 import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
-import Linear.Vector ((*^))
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 

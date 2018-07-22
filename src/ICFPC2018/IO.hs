@@ -72,6 +72,15 @@ putCommand (FusionP nd) = putWord8 byte
 putCommand (FusionS nd) = putWord8 byte
   where end = encodeNearDifference nd
         byte = 0b110 .|. (end `shiftL` 3)
+putCommand (Void nd) = putWord8 byte
+  where end = encodeNearDifference nd
+        byte = 0b010 .|. (end `shiftL` 3)
+putCommand (GFill nd fd) = putWord8 byte >> mapM_ (putWord8 . fromIntegral) fd
+  where end = encodeNearDifference nd
+        byte = 0b001 .|. (end `shiftL` 3)
+putCommand (GVoid nd fd) = putWord8 byte >> mapM_ (putWord8 . fromIntegral) fd
+  where end = encodeNearDifference nd
+        byte = 0b000 .|. (end `shiftL` 3)
 
 putTrace :: Trace -> Put
 putTrace = mapM_ (mapM_ putCommand . map snd . M.toAscList)

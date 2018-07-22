@@ -42,10 +42,12 @@ data Command
   | LMove !ShortDifference !ShortDifference
   | Fission !NearDifference !Int
   | Fill !NearDifference
+  | Void !NearDifference
   -- Group commands
   | FusionP !NearDifference
   | FusionS !NearDifference
   | GFill !NearDifference !FarDifference
+  | GVoid !NearDifference !FarDifference
   deriving (Show, Eq)
 type Step = Map BotIdx Command
 type Trace = [Step]
