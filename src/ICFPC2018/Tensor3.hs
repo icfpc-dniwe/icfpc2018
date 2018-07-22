@@ -21,6 +21,7 @@ module ICFPC2018.Tensor3
   , sliceView
   , sliceAxis
   , sliceAxisView
+  , inBounds
   ) where
 
 import Prelude hiding (replicate)
@@ -59,7 +60,7 @@ tensorIdx linIdx (V3 xSize ySize zSize) = (V3 x y z) where
 
 checkedLinearIdx :: Tensor3Size -> I3 -> Int
 checkedLinearIdx sz idx
-  | checkBounds sz idx = linearIdx sz idx
+  | inBox sz idx = linearIdx sz idx
   | otherwise = error "checkedLinearIdx: invalid index"
 
 checkedIdx :: Tensor3Size -> I3 -> I3
@@ -152,6 +153,9 @@ sliceAxisView (Tensor3View {..}) Z begin end = createView tensor (zBegin, zEnd)
   where
     zBegin = closestIdx + (V3 0 0 begin)
     zEnd = closestIdx + min farthestIdx (V3 0 0 end)
+
+inBounds :: Tensor3 a -> I3 -> Bool
+inBounds tensor = inBox (size tensor)
 
 instance Foldable Tensor3 where
   foldMap fun (Tensor3 v _) = foldMap fun v

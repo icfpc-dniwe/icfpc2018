@@ -10,8 +10,8 @@ a `div1` b
 
 infixl 7  `div1`
 
-checkBounds :: V3 Int -> V3 Int -> Bool
-checkBounds (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
+inBox :: V3 Int -> V3 Int -> Bool
+inBox (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
   = xIdx < xSize && xIdx >= 0 &&
     yIdx < ySize && yIdx >= 0 &&
     zIdx < zSize && zIdx >= 0
@@ -50,3 +50,10 @@ mlen v = sum $ abs <$> v
 -- Chebyshev distance
 clen :: Integral a => V3 a -> a
 clen v = foldr1 max $ abs <$> v
+
+linearPath :: V3 Int -> V3 Int -> [V3 Int]
+linearPath from path
+  | path == 0 = []
+  | otherwise = next : linearPath next (path - step)
+  where step = signum path
+        next = from + step

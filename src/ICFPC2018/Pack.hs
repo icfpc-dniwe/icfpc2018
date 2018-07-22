@@ -5,29 +5,23 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Linear.V3 (V3(..))
 import Linear.Vector ((*^))
-import ICFPC2018.Types
-import ICFPC2018.Utils
-import ICFPC2018.Model
-import ICFPC2018.Tensor3 (I3)
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 
+import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
-
+import ICFPC2018.Types
+import ICFPC2018.Utils
+import ICFPC2018.Model
 
 data SingleBotModel = SingleBotModel {
-    botPos      :: !VolatileCoordinate
+    singleBotPos :: !VolatileCoordinate
   , filledModel :: !Model
   } deriving (Show, Eq)
 
 
 zero :: VolatileCoordinate
 zero = V3 0 0 0
-
-mkLinearDifference :: Axis -> Int -> Difference
-mkLinearDifference X v = V3 v 0 0
-mkLinearDifference Y v = V3 0 v 0
-mkLinearDifference Z v = V3 0 0 v
 
 normalizeLinearDifference :: Difference -> Difference
 normalizeLinearDifference (V3 x y z) = V3 (norm x) (norm y) (norm z) where
@@ -72,7 +66,7 @@ neighbours = result where
 
   genSLN :: Model -> I3 -> Int -> I3 -> [I3]
   genSLN m c l n
-    = takeWhile (\i -> checkBounds (T3.size m) i && (not $ m T3.! i))
+    = takeWhile (\i -> inBox (T3.size m) i && (not $ m T3.! i))
     . map (\j -> c + j *^ n)
     $ [1..l]
 
@@ -88,20 +82,20 @@ simulateStep = simulateStep' where
 
   simulateStep' m = \case
     SMove d -> let
-      c  = botPos m
+      c  = singleBotPos m
       c' = c + d
       in do
         checkStepBounds m c' >> checkVoidPath m c c'
-        Right $ m {botPos = c'}
+        Right $ m {singleBotPos = c'}
 
     LMove d1 d2 -> let
-      c   = botPos m
+      c   = singleBotPos m
       c'  = c  + d1
       c'' = c' + d2
       in do
         checkStepBounds m c'  >> checkVoidPath m c c'
         checkStepBounds m c'' >> checkVoidPath m c' c''
-        Right $ m {botPos = c''}
+        Right $ m {singleBotPos = c''}
 
     cmd -> error $ "TODO: simulateStep " ++ (show cmd)
 
@@ -122,7 +116,7 @@ simulateStep = simulateStep' where
 
 
 startModel :: V3 Int -> SingleBotModel
-startModel sz = SingleBotModel {botPos = zero, filledModel = T3.replicate sz False}
+startModel sz = SingleBotModel {singleBotPos = zero, filledModel = T3.replicate sz False}
 
 singleBotCommandsToTrace :: BotIdx -> [Command] -> Trace
 singleBotCommandsToTrace bid cmds = M.fromList <$> zip [bid] <$> (\x -> [x]) <$> cmds where
@@ -131,9 +125,9 @@ packIntensions :: SingleBotModel -> Intensions -> Trace
 packIntensions m0 xs = t1 ++ t2 where
   (t1, m1) = first concat . (flip runState m0) . mapM packIntension $ xs
 
-  -- t2 = singleBotCommandsToTrace 0 $ (packMove (botPos m1) zero) ++ [Halt]
+  -- t2 = singleBotCommandsToTrace 0 $ (packMove (singleBotPos m1) zero) ++ [Halt]
   t2 = singleBotCommandsToTrace 0
-       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m1) mlenMetric (botPos m1) zero)
+       $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m1) mlenMetric (singleBotPos m1) zero)
        ++ [Halt]
 
   packIntension :: Intension -> State SingleBotModel Trace
@@ -143,13 +137,13 @@ packIntensions m0 xs = t1 ++ t2 where
 
       let lowerVoxel = V3 0 (-1) 0
       let upIdx      = idx + (V3 0 1 0)
-      let m'         = m {botPos = upIdx}
+      let m'         = m {singleBotPos = upIdx}
 
       put m'
 
-      -- return $ singleBotCommandsToTrace 0 $ packMove botPos upIdx ++ [Fill lowerVoxel]
+      -- return $ singleBotCommandsToTrace 0 $ packMove singleBotPos upIdx ++ [Fill lowerVoxel]
       return $ singleBotCommandsToTrace 0
-        $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenMetric (botPos m') upIdx)
+        $ (map snd $ fromMaybe (error "unable to return to zero") $ aStar (neighbours $ filledModel m') mlenMetric (singleBotPos m') upIdx)
         ++ [Fill lowerVoxel]
 
     FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
