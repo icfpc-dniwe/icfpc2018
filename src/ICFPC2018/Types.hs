@@ -5,6 +5,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import ICFPC2018.Tensor3 (Tensor3, I3, Axis(..))
 import Linear.V3 (V3(..))
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 type Model = Tensor3 Bool
 
@@ -27,7 +29,9 @@ type LongDifference  = Difference
 type NearDifference  = Difference
 type FarDifference   = Difference
 
-data HarmonicState = Low | High deriving (Show, Eq)
+data HarmonicState = Low | High deriving (Show, Eq, Generic)
+
+instance NFData HarmonicState
 
 changeHarmonic :: HarmonicState -> HarmonicState
 changeHarmonic Low = High
@@ -48,7 +52,10 @@ data Command
   | FusionS !NearDifference
   | GFill !NearDifference !FarDifference
   | GVoid !NearDifference !FarDifference
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance NFData Command
+
 type Step = Map BotIdx Command
 type Trace = [Step]
 type Score = Int

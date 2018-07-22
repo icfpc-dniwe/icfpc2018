@@ -4,9 +4,6 @@ module ICFPC2018.Simulation
   , initialState
   , debugState
   , stepState
-  , VoxelStatus(..)
-  , decomposeModel
-  , floodFill
   ) where
 
 import Control.Monad
@@ -16,9 +13,11 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as V
 import Linear.V3 (V3(..))
 import Debug.Trace
+import GHC.Generics (Generic)
+import Control.DeepSeq
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -39,7 +38,9 @@ data ExecState = ExecState { stateEnergy :: !Int
                            , stateGVoidDone :: !Bool
                            , stateHalted :: !Bool
                            }
-                           deriving (Show, Eq)
+                           deriving (Show, Eq, Generic)
+
+instance NFData ExecState
 
 type SeedsSet = IntSet
 
@@ -51,11 +52,13 @@ data FusionStatus = FusionMaster | FusionSlave
 data BotState = BotState { botPos :: !I3
                          , botSeeds :: !SeedsSet
                          }
-              deriving (Show, Eq)
+              deriving (Show, Eq, Generic)
 
-data SilulationVoxelAction = VoxelFill | VoxelVoid
+instance NFData BotState
+
+data SimulationVoxelAction = VoxelFill | VoxelVoid
                            deriving (Show, Eq)
-actionToBool :: SilulationVoxelAction -> Bool
+actionToBool :: SimulationVoxelAction -> Bool
 actionToBool VoxelFill = True
 actionToBool VoxelVoid = False
 
@@ -225,56 +228,3 @@ addVolatiles :: Set VolatileCoordinate -> Set VolatileCoordinate -> Maybe (Set V
 addVolatiles volatiles newVolatiles
   | S.null (volatiles `S.intersection` newVolatiles) = Just $ volatiles `S.union` newVolatiles
   | otherwise = Nothing
-
-
-
-data VoxelStatus
-  = VSUnknown
-  | VSEmpty
-  | VSGrounded
-  | VSFloating
-  deriving Eq
-
-instance Show VoxelStatus where
-  show VSUnknown  = "@"
-  show VSEmpty    = " "
-  show VSGrounded = "."
-  show VSFloating = "!"
-
-decomposeModel :: Model -> ([(I3, VoxelStatus)], Tensor3 VoxelStatus)
-decomposeModel m
-  = second (fmap (fromRight VSUnknown))
-  . first catMaybes
-  $ runState (mapM step idxs) (fmap Left m)
-  where
-    V3 w h d = T3.size m
-    idxs = [(V3 x y z) | y <- [0..(h-1)], x <- [0..(w-1)], z <- [0..(d-1)]]
-
-    step :: I3 -> State (Tensor3 (Either Bool VoxelStatus)) (Maybe (I3, VoxelStatus))
-    step idx@(V3 _ y _) = get >>= \s -> case (s T3.! idx) of
-      Left b -> do
-        let t = case b of
-                  False -> VSEmpty
-                  True  -> if (y == 0) then VSGrounded else VSFloating
-        put (floodFill idx (Right t) s)
-        return $ Just (idx, t)
-      _ -> return Nothing
-
-
-floodFill :: forall a. (Eq a) => I3 -> a -> Tensor3 a -> Tensor3 a
-floodFill idx0 v m0 = execState (step idx0) m0 where
-  sz = T3.size m0
-
-  step :: I3 -> State (Tensor3 a) ()
-  step idx = gets (T3.! idx) >>= \v0 -> case (v0 == v) of
-    True  -> return ()
-    False -> do
-      modify (\m -> T3.update m [(idx, v)])
-      mapM_ (\idx' -> get >>= \m' -> when (m' T3.! idx' == v0) $ step idx') (adjacent idx)
-
-  adjacent :: I3 -> [I3]
-  adjacent idx = filter (inSizeBounds sz) . map (idx+) $ [
-      (V3 1 0 0), -(V3 1 0 0)
-    , (V3 0 1 0), -(V3 0 1 0)
-    , (V3 0 0 1), -(V3 0 0 1)
-    ]

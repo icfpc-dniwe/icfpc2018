@@ -6,7 +6,7 @@ module ICFPC2018.IO
 import Data.Word
 import Data.Bits
 import Linear.V3 (V3(..))
-import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as V
 import qualified Data.Map as M
 import Data.Binary.Get
 import Data.Binary.Put
