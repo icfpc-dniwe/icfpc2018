@@ -9,7 +9,7 @@ import Linear.V3 (V3(..))
 import Control.Monad.State.Strict
 import Control.Arrow (first)
 
-import ICFPC2018.Tensor3 (I3)
+import ICFPC2018.Tensor3 (I3, Axis(..))
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Types
 import ICFPC2018.Utils

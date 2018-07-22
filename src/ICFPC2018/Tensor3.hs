@@ -5,6 +5,7 @@ module ICFPC2018.Tensor3
   , BoundingBox
   , Tensor3
   , T3
+  , Axis(..)
   , index
   , (!)
   , size

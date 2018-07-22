@@ -3,7 +3,7 @@ module ICFPC2018.Types where
 import Data.Map (Map)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import ICFPC2018.Tensor3 (Tensor3, I3)
+import ICFPC2018.Tensor3 (Tensor3, I3, Axis(..))
 import Linear.V3 (V3(..))
 
 type Model = Tensor3 Bool
@@ -59,7 +59,7 @@ data Intension
   deriving (Show, Eq)
 type Intensions = [Intension]
 
-data Axis = X | Y | Z deriving (Show, Eq, Enum, Bounded)
+-- data Axis = X | Y | Z deriving (Show, Eq, Enum, Bounded)
 
 maxSLD :: Int
 maxSLD = 5

@@ -1,4 +1,8 @@
-module ICFPC2018.Pipeline where
+module ICFPC2018.Pipeline
+  ( pipeline
+  , moveToZero
+  , sliceModel
+  ) where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -108,23 +112,6 @@ moveToZero state = M.singleton firstBot <$> commands
     bots = stateBots state
     pos = botPos $ bots M.! firstBot
     commands = packMove pos 0
-{-
-sliceModel :: Model -> Int -> [T3.BoundingBox]
-sliceModel m0 numBots = undefined
-  where
-    modelBox = T3.boundingBox m0 id
-    bottomLine = case modelBox of
-      (V3 x1 y1 z1, V3 x2 y2 z2) -> if (x2 - x1) > (z2 - z1)
-                                    then (X, x1, x2)
-                                    else (Z, z1, z2)
-    slice (X, from, to) = undefined
-    slice (Z, from, to) = undefined
-
-    mergeTraces :: [Trace] -> Trace
-    mergeTraces traces = foldr helper $ zip [1..] traces
-      where
-        helper = undefined
--}
 
 solve :: Model -> [I3] -> Intensions
 solve model idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
@@ -142,4 +129,14 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
       | idx - lastIdx == dir = helper way idx ixs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
-getNextLine _ = undefined
+    getNextLine _ = undefined
+
+sliceModel :: Model -> [Model]
+sliceModel model = map (\(begin, end) -> T3.sliceAxis model T3.Y begin (end - 1)) boundings
+  where
+    V3 _ ySize _ = T3.size model
+    indices = [0, maxFD .. (ySize - 2)] ++ [ySize]
+    boundings = zip (init indices) (tail indices)
+
+bboxHeuristics :: Model -> Double
+bboxHeuristics = undefined
