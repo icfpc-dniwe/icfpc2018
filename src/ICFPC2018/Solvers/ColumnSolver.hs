@@ -6,7 +6,7 @@ import qualified ICFPC2018.Tensor3 as T3
 
 import Linear.V3 (V3(..))
 import qualified Data.List as L
-import qualified Data.Map as M
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import Control.Monad.State.Strict
 
@@ -65,7 +65,7 @@ fillLayer task = do
     let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ adjacentVoxels pos) state'
         indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
         allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
-        in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
+        in return $ IM.fromList <$> (L.transpose $ allBotCommands bots)
 
 fillUnderBot :: Model -> State ColumnSolverModel Trace
 fillUnderBot task = do
@@ -73,7 +73,7 @@ fillUnderBot task = do
     let botCommands pos = fst $ runState (mapM (fillVoxel task pos) $ [pos + (V3 0 (-1) 0)]) state'
         indexedBotCommands idx pos = map (\cmd -> (idx, cmd)) $ botCommands pos
         allBotCommands = map (\(Bot idx pos _) -> indexedBotCommands idx pos)
-        in return $ M.fromList <$> (L.transpose $ allBotCommands bots)
+        in return $ IM.fromList <$> (L.transpose $ allBotCommands bots)
 
 moveUp :: State ColumnSolverModel Trace
 moveUp = do
@@ -83,7 +83,7 @@ moveUp = do
             layer = layer + 1,
             bots = drop 1 bots ++ updBots
         }
-    return [M.fromList (map (\(Bot idx _ _) -> (idx, SMove (V3 0 1 0))) bots)]
+    return [IM.fromList (map (\(Bot idx _ _) -> (idx, SMove (V3 0 1 0))) bots)]
 
 processLayer :: Model -> State ColumnSolverModel Trace
 processLayer task = do

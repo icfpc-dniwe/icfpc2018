@@ -4,7 +4,7 @@ import ICFPC2018.Types
 import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
 import Linear.V3 (V3(..))
-import Data.Map as M
+import Data.IntMap as IM
 
 type EnterPos = I3
 type ExitPos = I3
@@ -23,7 +23,7 @@ voxel = Primitive
         { enterPos = [(V3 x y z) | x <- [0..2], y <- [0..2], z <- [0..2], not (x == y && y == z)]
         , exitPos = [id]
         , numBots = 1
-        , commands = \pos -> [M.singleton 0 (Fill $ center - pos)]
+        , commands = \pos -> [IM.singleton 0 (Fill $ center - pos)]
         , filled = nullTensor `T3.update` [(center, True)]
         , primitiveSize = \pos -> nullTensor `T3.update` [(center, True), (pos, True)]
         }
@@ -36,7 +36,7 @@ x2Line = Primitive
          { enterPos = [(V3 x y z) | x <- [0, 1], y <- [0..2], z <- [0..2], not (y == 1 && z == 1)]
          , exitPos = [id]
          , numBots = 1
-         , commands = \pos -> [M.fromList [(0, (Fill $ centerYZ 0 - pos)), (0, (Fill $ centerYZ 1 - pos))]]
+         , commands = \pos -> [IM.fromList [(0, (Fill $ centerYZ 0 - pos)), (0, (Fill $ centerYZ 1 - pos))]]
          , filled = filledTensor
          , primitiveSize = \pos -> filledTensor `T3.update` [(pos, True)]
          }

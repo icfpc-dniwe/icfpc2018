@@ -1,13 +1,13 @@
 module ICFPC2018.Tensor3
   ( Tensor3Size
-  , T3View
   , I3
   , BoundingBox
   , Tensor3
-  , T3
+  , MTensor3
   , Axis(..)
   , index
   , (!)
+  , copyView
   , size
   , update
   , create
@@ -21,15 +21,25 @@ module ICFPC2018.Tensor3
   , showZ
   , scanY
   , scanZ
+  , freeze
+  , thaw
+  , unsafeFreeze
+  , unsafeThaw
+  , read
+  , write
   ) where
 
-import Prelude hiding (replicate)
+import Prelude hiding (read, replicate)
 import Control.Arrow
 import Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
+import Data.Vector.Unboxed.Mutable (MVector)
+import qualified Data.Vector.Generic as MV
+import qualified Data.Vector.Unboxed.Mutable as MV
 import Linear.V3 (V3(..))
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Control.Monad.Primitive (PrimMonad(..))
 
 import ICFPC2018.Utils
 
@@ -45,13 +55,15 @@ data T3 a = T3 !(Vector a) !Tensor3Size
           deriving (Show, Eq, Generic)
 
 data T3View a = T3View
-               { tensor :: !(T3 a)
-               , closestIdx :: !I3
-               , farthestIdx :: !I3
-               , sizeView :: !Tensor3Size
-               } deriving (Show, Eq, Generic)
+                { tensor :: !(T3 a)
+                , closestIdx :: !I3
+                , farthestIdx :: !I3
+                , sizeView :: !Tensor3Size
+                } deriving (Show, Eq, Generic)
 
 data Tensor3 a = Tensor !(T3 a) | View !(T3View a) deriving (Show, Eq, Generic)
+
+data MTensor3 s a = MT3 !(MVector s a) !(Tensor3Size)
 
 instance NFData a => NFData (T3 a)
 
@@ -88,12 +100,18 @@ sizeT (T3 _ sz) = sz
 
 infixl 9 `index`
 index :: Unbox a => Tensor3 a -> I3 -> a
-index (Tensor (T3 v sz)) idx = v `V.unsafeIndex` checkedLinearIdx sz idx
-index (View (T3View {..})) idx = (Tensor tensor) `index` (closestIdx + checkedIdx sizeView idx)
+index (Tensor (T3 v sz)) idx = lidx `seq` (v `V.unsafeIndex` lidx)
+  where lidx = checkedLinearIdx sz idx
+index (View (T3View { tensor = T3 dat sz, .. })) idx = lidx `seq` (dat `V.unsafeIndex` lidx)
+  where lidx = linearIdx sz (closestIdx + checkedIdx sizeView idx)
 
 infixl 9 !
 (!) :: Unbox a => Tensor3 a -> I3 -> a
 (!) = index
+
+copyView :: Unbox a => T3View a -> T3 a
+copyView (T3View { tensor = T3 dat sz, .. }) = T3 (V.fromList $ map (V.unsafeIndex dat . linearIdx sz) $ boxIndices closestIdx farthestIdx) sizeView
+
 {-
 infixl 9 `indexView`
 indexView :: Tensor3View a -> I3 -> a
@@ -110,7 +128,9 @@ update (View tView) updates = View $ tView `updateView` updates
 
 updateT :: Unbox a => T3 a -> [(I3, a)] -> T3 a
 updateT tensor [] = tensor
-updateT (T3 v sz) updates = T3 (V.unsafeUpd v $ map (first $ checkedLinearIdx sz) updates) sz
+updateT (T3 v sz) updates = T3 (V.unsafeUpd v $ map convert updates) sz
+  where convert (idx, val) = iidx `seq` (iidx, val)
+          where iidx = checkedLinearIdx sz idx
 
 updateView :: Unbox a => T3View a -> [(I3, a)] -> T3View a
 updateView tensor [] = tensor
@@ -150,7 +170,7 @@ slice (Tensor tensor) bbox = View $ createView tensor bbox
 slice (View (T3View {..})) (closestNew, farthestNew)
   | closestNew >= (V3 0 0 0) &&
     farthestNew < sizeView = View $ createView tensor bbox
-  | otherwise = error "changeView: invalind bounding box"
+  | otherwise = error "changeView: invalid bounding box"
     where
       bbox = (closestIdx + closestNew, closestIdx + farthestNew)
 
@@ -205,3 +225,31 @@ scanZ s = (replicate (V3 n n n) ' ') `update` upd where
   n  = length ls
   enum = zip [0..(n-1)]
   upd = [(V3 x y z, v) | z <- [0..(n-1)], (y, w) <- (enum (map enum ls)), (x, v) <- w]
+
+thawT :: (Unbox a, PrimMonad m) => T3 a -> m (MTensor3 (PrimState m) a)
+thawT (T3 dat sz) = MT3 <$> MV.thaw dat <*> pure sz
+
+thaw :: (Unbox a, PrimMonad m) => Tensor3 a -> m (MTensor3 (PrimState m) a)
+thaw (Tensor t) = thawT t
+thaw (View v) = thawT $ copyView v
+
+freeze :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> m (Tensor3 a)
+freeze (MT3 dat sz) = Tensor <$> (T3 <$> MV.freeze dat <*> pure sz)
+
+unsafeThawT :: (Unbox a, PrimMonad m) => T3 a -> m (MTensor3 (PrimState m) a)
+unsafeThawT (T3 dat sz) = MT3 <$> MV.unsafeThaw dat <*> pure sz
+
+unsafeThaw :: (Unbox a, PrimMonad m) => Tensor3 a -> m (MTensor3 (PrimState m) a)
+unsafeThaw (Tensor t) = unsafeThawT t
+unsafeThaw (View v) = unsafeThawT $ copyView v
+
+unsafeFreeze :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> m (Tensor3 a)
+unsafeFreeze (MT3 dat sz) = Tensor <$> (T3 <$> MV.unsafeFreeze dat <*> pure sz)
+
+read :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> I3 -> m a
+read (MT3 dat sz) idx = (lidx `seq`) <$> MV.unsafeRead dat lidx
+  where lidx = checkedLinearIdx sz idx
+
+write :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> I3 -> a -> m ()
+write (MT3 dat sz) idx val = MV.unsafeWrite dat lidx (lidx `seq` val)
+  where lidx = checkedLinearIdx sz idx
