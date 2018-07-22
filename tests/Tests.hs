@@ -18,8 +18,6 @@ import ICFPC2018.Model
 import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 
-import Debug.Trace
-
 main :: IO ()
 main = defaultMain tests
 
@@ -218,8 +216,11 @@ checkPath model start finish path0@(_:_)
 aStarTests :: TestTree
 aStarTests = testGroup "A* tests" [aStarRandom, aStarGuaranteed]
 
+pathFindingTime :: Int
+pathFindingTime = 5 * 10^(5::Int)
+
 aStarRandom :: TestTree
-aStarRandom = QC.testProperty "A* random models passable" $ within (2 * 10^(6::Int)) $ forAll (arbitrary `suchThat` suitableModel) testPassable
+aStarRandom = QC.testProperty "A* random models passable" $ within pathFindingTime $ forAll (arbitrary `suchThat` suitableModel) testPassable
   where suitableModel model = product (T3.size model) /= 0 && not (model T3.! start)
         start = 0
         testPassable model =
@@ -241,7 +242,7 @@ packTests = testGroup "Pack tests"
   ]
 
 packMoveTest :: TestTree
-packMoveTest = QC.testProperty "packMoves is valid" $ within (2 * 10^(6::Int)) $ forAll testValues $
+packMoveTest = QC.testProperty "packMoves is valid" $ within pathFindingTime $ forAll testValues $
   \(state, p) -> isJust $ foldM stepState state $ map (M.singleton 1) $ packMove 0 p
   where testValues = do
           state <- genEmptyExecState
@@ -258,7 +259,7 @@ genFillablePoint state = do
   V3 <$> choose (1, r - 2) <*> choose (0, r - 2) <*> choose (1, r - 2)
 
 emptySingleIntension :: TestTree
-emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within (2 * 10^(6::Int)) $ forAll testValues $
+emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within pathFindingTime $ forAll testValues $
   \(state, p) -> testSingleBotPackIntensions [FillIdx p] state
   where testValues = do
           state <- genEmptyExecState
@@ -266,5 +267,5 @@ emptySingleIntension = QC.testProperty "Single fill on an empty matrix" $ within
           return (state, p)
 
 nonEmptySingleIntension :: TestTree
-nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within (2 * 10^(6::Int)) $
+nonEmptySingleIntension = QC.testProperty "Single fill on a filled matrix" $ within pathFindingTime $
   \state -> testSingleBotPackIntensions [FillIdx (T3.size (stateMatrix state) - 2)] state
