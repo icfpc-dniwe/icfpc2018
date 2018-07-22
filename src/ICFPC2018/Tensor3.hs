@@ -27,6 +27,8 @@ import Prelude hiding (replicate)
 import Control.Arrow
 import Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
+import Data.Vector.Unboxed.Mutable (MVector)
+import qualified Data.Vector.Unboxed.Mutable as MV
 import Linear.V3 (V3(..))
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
@@ -52,6 +54,8 @@ data T3View a = T3View
                } deriving (Show, Eq, Generic)
 
 data Tensor3 a = Tensor !(T3 a) | View !(T3View a) deriving (Show, Eq, Generic)
+
+data MTensor3 s a = MTensor3 !(MVector s a) !(Tensor3Size)
 
 instance NFData a => NFData (T3 a)
 
