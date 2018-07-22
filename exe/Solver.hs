@@ -22,8 +22,8 @@ main = do
   let model = runGet getModel modelData
       V3 r _ _ = T3.size model
       state0 = initialState r
-      solution = traceShowId $ packSingleBotIntensions (stateMatrix state0) 1 0 $ solver model
-      -- solution = pipeline model
+      -- solution = traceShowId $ packSingleBotIntensions (stateMatrix state0) 1 0 $ solver model
+      solution = pipeline model
       traceData = runPut $ putTrace solution
   
       debugState state step = case stepState state step of
