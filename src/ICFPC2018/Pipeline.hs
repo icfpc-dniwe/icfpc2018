@@ -2,6 +2,7 @@ module ICFPC2018.Pipeline
   ( pipeline
   , moveToZero
   , sliceModel
+  , bboxHeuristics
   ) where
 
 import Data.Map.Strict (Map)
