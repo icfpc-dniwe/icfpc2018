@@ -21,6 +21,8 @@ import ICFPC2018.Tensor3 (I3)
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Validation
 
+import Debug.Trace
+
 data ExecState = ExecState { stateEnergy :: !Int
                            , stateHarmonics :: !HarmonicState
                            , stateMatrix :: !Model
@@ -145,25 +147,37 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
     -- Handled in FusionP
     FusionS _ -> return (state, volatiles)
     GFill _ _ -> do
+      traceM ("state gfill: " ++ show stateGFillDone)
+
       if (not stateGFillDone) then do
         let allBots = botsPerformingGFill step
         let allCommands = (step M.!) <$> allBots
-        guard $ all (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
-
         let botPositions' = botPos <$> (stateBots M.!) <$> allBots
+
+        traceM ("bots       : " ++ show allBots)
+        traceM ("positions  : " ++ show botPositions')
+        traceM ("commands   : " ++ show allCommands)
+        traceM ("check      : " ++ show (map (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands))
+        guard $ all (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
         
         let srcCorners = map (\((GFill nd' _), pos) -> pos + nd') $ zip allCommands botPositions'
         let dstCorners = map (\((GFill nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions'
+
+        traceM ("src corners: " ++ show srcCorners)
+        traceM ("dst corners: " ++ show dstCorners)
         guard $ all (\c -> T3.inBounds stateMatrix c) srcCorners
         guard $ all (\c -> T3.inBounds stateMatrix c) dstCorners
         guard $ all (\c -> elem c srcCorners) dstCorners
 
         let bboxes = map (\(s,d) -> getBox s d) $ zip srcCorners dstCorners
         let distinctRegions = S.toList $ S.fromList bboxes
+
+        traceM ("distinctRegions: " ++ show distinctRegions)
+        traceM ("check2         : " ++ show (not $ any id $ concat $ map (\pos -> map (\(b0,b1) -> inBox b0 b1 pos) distinctRegions) botPositions'))
         guard $ not $ any id $ concat $ map (\pos -> map (\(b0,b1) -> inBox b0 b1 pos) distinctRegions) botPositions'
 
         (state', volatiles') <- foldM (updateRegion VoxelFill) (state, volatiles) $ map (\(b0,b1) -> boxIndices b0 b1) distinctRegions
-        return $ (state' { stateGVoidDone = True }, volatiles')
+        return (state' { stateGVoidDone = True }, volatiles')
       else do
         return (state, volatiles)
     GVoid _ _ -> do

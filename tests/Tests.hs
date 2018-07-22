@@ -2,6 +2,7 @@
 
 import Control.Monad
 import Data.Maybe
+import qualified Data.IntSet as IS
 import qualified Data.Vector as V
 import qualified Data.Map as M
 import Linear.V3 (V3(..))
@@ -127,15 +128,24 @@ testModel = T3.create
               , False, False, False, False
               ]) (V3 4 4 4)
 
-runOnMatrix :: Model -> [[(Int, Command)]] -> Maybe ExecState
-runOnMatrix matrix = foldM stepState ((initialState r) { stateMatrix = matrix }) . map M.fromList
-  where V3 r _ _ = T3.size matrix
+runOnMatrix :: Model -> ExecState -> [[(Int, Command)]] -> Maybe ExecState
+runOnMatrix matrix initState = foldM {-stepState-}debugState (initState { stateMatrix = matrix }) . map M.fromList
 
-runEmptyMatrix :: [[(Int, Command)]] -> Maybe ExecState
-runEmptyMatrix = runOnMatrix emptyModel
+runOnMatrix' :: Model -> [[(Int, Command)]] -> Maybe ExecState
+runOnMatrix' matrix = runOnMatrix matrix $ initialState r where
+  V3 r _ _ = T3.size matrix
 
-runTestMatrix :: [[(Int, Command)]] -> Maybe ExecState
-runTestMatrix = runOnMatrix testModel
+runEmptyMatrix :: ExecState -> [[(Int, Command)]] -> Maybe ExecState
+runEmptyMatrix initState = runOnMatrix emptyModel initState
+
+runEmptyMatrix' :: [[(Int, Command)]] -> Maybe ExecState
+runEmptyMatrix' = runOnMatrix' emptyModel
+
+runTestMatrix :: ExecState -> [[(Int, Command)]] -> Maybe ExecState
+runTestMatrix initState = runOnMatrix testModel initState
+
+runTestMatrix' :: [[(Int, Command)]] -> Maybe ExecState
+runTestMatrix' = runOnMatrix' testModel
 
 simulationTests :: TestTree
 simulationTests = testGroup "Simulation tests" [
@@ -143,6 +153,7 @@ simulationTests = testGroup "Simulation tests" [
   , simulationLMove
   , simulationSMoveErrors
   , simulationLMoveErrors
+  , simulationGFillTests
   ]
 
 goodStep :: Model -> I3 -> I3 -> Bool
@@ -162,8 +173,8 @@ simulationSMoveErrors = testGroup "SMove edge cases"
   , failEmpty "SMove: out of bounds" [[(1, SMove (V3 (-1) 0 0))]]
   , failTest "SMove: collision" [[(1, SMove (V3 1 0 0))], [(1, SMove (V3 0 0 1))]]
   ]
-  where failEmpty name steps = HU.testCase name $ runEmptyMatrix steps @?= Nothing
-        failTest name steps = HU.testCase name $ runTestMatrix steps @?= Nothing
+  where failEmpty name steps = HU.testCase name $ runEmptyMatrix' steps @?= Nothing
+        failTest name steps = HU.testCase name $ runTestMatrix' steps @?= Nothing
 
 simulationLMove :: TestTree
 simulationLMove = QC.testProperty "LMove" $ forAll testValues $
@@ -181,8 +192,99 @@ simulationLMoveErrors = testGroup "LMove edge cases"
   , failEmpty "LMove: out of bounds" [[(1, LMove (V3 (-1) 0 0) (V3 1 0 0))]]
   , failTest "LMove: collision" [[(1, LMove (V3 1 0 0) (V3 0 0 1))]]
   ]
-  where failEmpty name steps = HU.testCase name $ runEmptyMatrix steps @?= Nothing
-        failTest name steps = HU.testCase name $ runTestMatrix steps @?= Nothing
+  where failEmpty name steps = HU.testCase name $ runEmptyMatrix' steps @?= Nothing
+        failTest name steps = HU.testCase name $ runTestMatrix' steps @?= Nothing
+
+-- GFill tests
+-- RNBMX means N regions, M bots, Pass/Fail
+data GFillTestPrimitive = R1B2P | R1B4P | R1B8P | R2B4P | R2B8P | R2B16P | R1B2F | R1B4F | R1B8F | R2B4F | R2B8F | R2B16F | R1B7F
+                        deriving (Show, Eq)
+
+genBot :: I3 -> BotState
+genBot pos = BotState { botPos = pos, botSeeds = IS.empty }
+
+initialGFillBots :: GFillTestPrimitive -> [BotState]
+initialGFillBots R1B2P  = genBot <$> [V3 0 0 0, V3 0 0 4]
+initialGFillBots R1B4P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4]
+initialGFillBots R1B8P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4]
+initialGFillBots R2B4P  = genBot <$> [V3 0 0 0, V3 0 0 4, V3 4 3 0, V3 0 3 0]
+initialGFillBots R2B8P  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 5 1 0, V3 5 5 0, V3 5 5 1, V3 5 1 5]
+initialGFillBots R2B16P = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4,
+                                      V3 6 6 6, V3 9 6 6, V3 9 6 9, V3 6 6 9, V3 6 9 6, V3 9 9 6, V3 6 6 6, V3 9 6 6]
+initialGFillBots R1B2F  = genBot <$> [V3 1 0 0, V3 0 0 4]
+initialGFillBots R1B4F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 3, V3 0 0 4]
+initialGFillBots R1B8F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 2 0, V3 4 4 0, V3 4 5 4, V3 0 4 4]
+initialGFillBots R2B4F  = genBot <$> [V3 0 0 0, V3 0 0 4, V3 2 0 0, V3 0 0 6]
+initialGFillBots R2B8F  = genBot <$> [V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4, V3 2 0 0, V3 2 4 0, V3 2 4 4, V3 2 0 4]
+initialGFillBots R2B16F = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 0 4 0, V3 4 4 0, V3 4 4 4, V3 0 4 4,
+                                      V3 2 2 2, V3 6 2 2, V3 6 2 6, V3 2 2 6, V3 2 6 2, V3 6 6 2, V3 6 6 6, V3 2 6 6]
+initialGFillBots R1B7F  = genBot <$> [V3 0 0 0, V3 4 0 0, V3 4 0 4, V3 0 0 4, V3 5 1 0, V3 5 5 0, V3 5 5 1]
+
+genGFillStep' :: [Command] -> Step
+genGFillStep' cmds = M.fromList $ zip [1..] cmds
+
+genGFillStep :: GFillTestPrimitive -> Step
+genGFillStep R1B2P  = genGFillStep' [GFill (V3   0    0    1 ) (V3   0    0    2 ),
+                                     GFill (V3   0    0  (-1)) (V3   0    0  (-2))
+                                    ]
+genGFillStep R1B4P  = genGFillStep' [GFill (V3   0    1    0 ) (V3   4    0    4 ),
+                                     GFill (V3   4    1    0 ) (V3 (-4)   0    4 ),
+                                     GFill (V3   4    1    4 ) (V3 (-4)   0  (-4)),
+                                     GFill (V3   0    1    4 ) (V3   4    0  (-4))
+                                    ]
+genGFillStep R1B8P  = genGFillStep' [GFill (V3   1    1    1 ) (V3   2    2    2 ),
+                                     GFill (V3 (-1)   1    1 ) (V3 (-2)   2    2 ),
+                                     GFill (V3 (-1)   1  (-1)) (V3 (-2)   2  (-2)),
+                                     GFill (V3   1    1  (-1)) (V3   2    2  (-2)),
+                                     GFill (V3   1  (-1)   1 ) (V3   2  (-2)   2 ),
+                                     GFill (V3 (-1) (-1)   1 ) (V3 (-2) (-2)   2 ),
+                                     GFill (V3 (-1) (-1) (-1)) (V3 (-2) (-2) (-2)),
+                                     GFill (V3   1  (-1) (-1)) (V3   2  (-2) (-2))
+                                    ]
+genGFillStep R2B4P  = genGFillStep' [GFill (V3   0    1    0 ) (V3   0    0    4 ),
+                                     GFill (V3   0    1    4 ) (V3   0    0  (-4)),
+                                     GFill (V3   0  (-1)   0 ) (V3 (-4)   0    0 ),
+                                     GFill (V3   0  (-1)   0 ) (V3   4    0    0 )
+                                    ]
+genGFillStep R2B8P  = genGFillStep' [GFill (V3   1    0    1 ) (V3   2    0    2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2)   0    2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2)   0  (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2    0  (-2)),
+                                     GFill (V3   1    0    1 ) (V3   2    0    2 ),
+                                     GFill (V3 (-1)   0    1 ) (V3 (-2)   0    2 ),
+                                     GFill (V3 (-1)   0  (-1)) (V3 (-2)   0  (-2)),
+                                     GFill (V3   1    0  (-1)) (V3   2    0  (-2))
+                                    ]
+genGFillStep R2B16P = M.union (genGFillStep R1B8P) (genGFillStep R1B8P)
+genGFillStep R1B2F  = genGFillStep R1B2P
+genGFillStep R1B4F  = genGFillStep R1B4P
+genGFillStep R1B8F  = genGFillStep R1B8P
+genGFillStep R2B4F  = genGFillStep R2B4P
+genGFillStep R2B8F  = genGFillStep R2B8P
+genGFillStep R2B16F = genGFillStep R2B16P
+genGFillStep R1B7F  = genGFillStep R1B8P
+
+initialGFillState :: M.Map BotIdx BotState -> ExecState
+initialGFillState bots = ExecState {
+    stateEnergy = 0
+  , stateHarmonics = High
+  , stateMatrix = emptyModel
+  , stateBots = bots
+  , stateGFillDone = False
+  , stateGVoidDone = False
+  , stateHalted = False
+  }
+
+simulationGFillTests :: TestTree
+simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests where
+  failEmpty name bots steps = HU.testCase name $ runEmptyMatrix (initialGFillState bots) steps @?= Nothing
+  succEmpty name bots steps = HU.testCase name $ isJust (runEmptyMatrix (initialGFillState bots) steps) @?= True
+  failCases = [{-R1B2F, R1B4F, R1B8F, R2B4F, R2B8F, R2B16F, R1B7F-}]
+  succCases = [R1B2P{-, R1B4P, R1B8P, R2B4P, R2B8P, R2B16P-}]
+  failBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) failCases
+  succBots = map (\gen -> M.fromList $ zip [1..] $ initialGFillBots gen) succCases
+  failTests = map (\(bots, gen) -> failEmpty ("GFill: " ++ show gen) bots [M.toList $ genGFillStep gen]) $ zip failBots failCases
+  succTests = map (\(bots, gen) -> succEmpty ("GFill: " ++ show gen) bots [M.toList $ genGFillStep gen]) $ zip succBots succCases
 
 --
 -- A* tests
