@@ -23,6 +23,7 @@ module ICFPC2018.Tensor3
   ) where
 
 import Prelude hiding (replicate)
+import qualified Prelude as Pr
 import Control.Arrow
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -47,7 +48,7 @@ data T3View a = T3View
                } deriving (Show, Eq)
 
 instance Foldable T3View where
-  foldMap = error "instance Foldable T3View: implement me!"
+  foldMap fun view = foldMap (\idx -> fun $ (View view) ! idx) $ indexing $ size (View view)
 
 instance Functor T3View where
   fmap f t = t { tensor = fmap f (tensor t)}

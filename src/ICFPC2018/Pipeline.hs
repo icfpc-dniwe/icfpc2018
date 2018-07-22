@@ -148,7 +148,5 @@ sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end
     indices = [0, maxFD .. (sz - 2)] ++ [sz]
     boundings = zip (init indices) (tail indices)
 
-{-
 bboxHeuristics :: Model -> Double
 bboxHeuristics = undefined
--}
