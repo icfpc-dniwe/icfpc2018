@@ -59,7 +59,10 @@ moveTrace state intensions = helper state intensions []
       Just st' -> st'
     helper st ints tr = case mergedMove st ints of
       Nothing -> (st, tr)
-      Just (curTrace, ints') -> helper (proceedState st curTrace) ints' (tr ++ curTrace)
+      Just (curTrace, ints') -> helper (proceedState st' fillMove) ints' (tr ++ curTrace ++ fillMove)
+        where
+          st' = proceedState st curTrace
+          fillMove = [fillLine st']
 
 moveBots :: ExecState -> Intensions -> Maybe (Map BotIdx [Command], Intensions)
 moveBots state intensions = case getNextLine intensions of
@@ -129,7 +132,7 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
       | idx - lastIdx == dir = helper way idx ixs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
-    getNextLine _ = undefined
+getNextLine _ = undefined
 
 sliceModel :: Model -> [Model]
 sliceModel model = map (\(begin, end) -> T3.sliceAxis model T3.Y begin (end - 1)) boundings
@@ -138,5 +141,7 @@ sliceModel model = map (\(begin, end) -> T3.sliceAxis model T3.Y begin (end - 1)
     indices = [0, maxFD .. (ySize - 2)] ++ [ySize]
     boundings = zip (init indices) (tail indices)
 
+{-
 bboxHeuristics :: Model -> Double
 bboxHeuristics = undefined
+-}
