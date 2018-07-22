@@ -86,7 +86,7 @@ instance Arbitrary ExecState where
     let V3 r _ _ = T3.size m
     return $ (initialState r) { stateMatrix = m }
 
-instance Arbitrary Axis where
+instance Arbitrary T3.Axis where
   arbitrary = arbitraryBoundedEnum
 
 genLinearDifference :: Int -> Gen I3

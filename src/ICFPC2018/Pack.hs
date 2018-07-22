@@ -101,4 +101,4 @@ packSingleBotIntensions model0 botIdx botPos0 xs = t1 ++ t2 where
       put $ m {singleBotPos = upIdx, filledModel = T3.update filledModel [(idx, True)] }
       return $ singleBotCommandsToTrace botIdx $ path ++ [Fill lowerVoxel]
 
-    FlipGravity -> return $ singleBotCommandsToTrace 0 [Flip]
+    FlipGravity -> return $ singleBotCommandsToTrace botIdx [Flip]
