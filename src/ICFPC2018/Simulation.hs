@@ -195,7 +195,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
                                               VoxelFill -> if occupied then 6 else 12
                                               VoxelVoid -> if occupied then -12 else 3
         updateRegion action (state'', volatiles'') voxels = do
-          volatiles' <- addVolatiles state'' volatiles'' (S.fromList voxels)
+          volatiles' <- addVolatiles volatiles'' (S.fromList voxels)
           let energyDelta = sum $ (updateEnergyDelta action) <$> (stateMatrix T3.!) <$> voxels
           return (state'' {
               stateMatrix = T3.update stateMatrix $ zip voxels [(actionToBool action)..],
