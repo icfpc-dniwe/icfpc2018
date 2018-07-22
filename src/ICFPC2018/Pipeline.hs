@@ -132,10 +132,10 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
   where
     helper _ lastIdx [] = Just ((firstIdx, lastIdx), [])
     helper Any lastIdx intensions@((FillIdx idx):ixs)
-      | mlenMetric lastIdx idx == 1 = helper (Path (idx - lastIdx)) idx ixs
+      | mlenDistance lastIdx idx == 1 = helper (Path (idx - lastIdx)) idx ixs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper way@(Path dir) lastIdx intensions@((FillIdx idx):ixs)
-      | mlenMetric firstIdx lastIdx >= maxFD = Just ((firstIdx, lastIdx), intensions)
+      | mlenDistance firstIdx lastIdx >= maxFD = Just ((firstIdx, lastIdx), intensions)
       | idx - lastIdx == dir = helper way idx ixs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)

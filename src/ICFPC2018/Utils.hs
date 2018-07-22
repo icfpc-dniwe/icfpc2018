@@ -10,8 +10,8 @@ a `div1` b
 
 infixl 7  `div1`
 
-inBox :: V3 Int -> V3 Int -> Bool
-inBox (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
+inSizeBounds :: V3 Int -> V3 Int -> Bool
+inSizeBounds (V3 xSize ySize zSize) (V3 xIdx yIdx zIdx)
   = xIdx < xSize && xIdx >= 0 &&
     yIdx < ySize && yIdx >= 0 &&
     zIdx < zSize && zIdx >= 0
@@ -57,3 +57,22 @@ linearPath from path
   | otherwise = next : linearPath next (path - step)
   where step = signum path
         next = from + step
+
+mlenDistance :: Integral a => V3 a -> V3 a -> a
+mlenDistance x x' = mlen (x - x')
+
+infix 6 `mlenDistance`
+
+-- Bounding box indices
+boxIndices :: Enum a => V3 a -> V3 a -> [V3 a]
+boxIndices (V3 xA yA zA) (V3 xB yB zB) = [ V3 x y z
+                                         | x <- [xA..xB]
+                                         , y <- [yA..yB]
+                                         , z <- [zA..zB]
+                                         ]
+
+inBox :: Ord a => V3 a -> V3 a -> V3 a -> Bool
+inBox (V3 xA yA zA) (V3 xB yB zB) (V3 x y z)
+  = x <= xB && x >= xA &&
+    y <= yB && y >= yA &&
+    z <= zB && z >= zA
