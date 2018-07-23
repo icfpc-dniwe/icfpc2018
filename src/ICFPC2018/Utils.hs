@@ -1,5 +1,7 @@
 module ICFPC2018.Utils where
 
+import Data.Foldable
+import Data.Ord
 import Control.Applicative
 import Linear.V3 (V3(..))
 
@@ -91,3 +93,6 @@ splitPlanar _ = Nothing
 
 maybeAlt :: Alternative f => Maybe a -> f a
 maybeAlt = maybe empty pure
+
+argmax :: (Ord a, Foldable t) => t a -> Int
+argmax elems = fst $ maximumBy (comparing snd) $ zip [0..] $ toList elems

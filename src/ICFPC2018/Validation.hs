@@ -3,6 +3,7 @@ module ICFPC2018.Validation
   , validShortDifference
   , validNearDifference
   , validFarDifference
+  , validFusion
   , fillablePoint
   ) where
 
@@ -32,3 +33,13 @@ validFarDifference dist = clen dist <= 30
 
 fillablePoint :: Tensor3Size -> I3 -> Bool
 fillablePoint size = inBox (V3 1 0 1) (size - 2)
+
+validFusion :: BotPos -> BotPos -> Bool
+validFusion masterPos slavePos = validNearDifference (masterPos - slavePos)
+{-
+possibleGFill :: [BotPos] -> Bool
+possibleGFill = undefined
+
+validGFill :: [(NearDifference, FarDifference)] -> Bool
+validGFill = undefined
+-}

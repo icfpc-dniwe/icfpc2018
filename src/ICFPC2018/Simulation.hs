@@ -9,6 +9,7 @@ module ICFPC2018.Simulation
   , thawState
   , stepState
   , stepStateM
+  , reverseTrace
   ) where
 
 import Data.Maybe
@@ -252,3 +253,41 @@ addVolatiles :: Set VolatileCoordinate -> Set VolatileCoordinate -> Maybe (Set V
 addVolatiles volatiles newVolatiles
   | S.null (volatiles `S.intersection` newVolatiles) = Just $ volatiles `S.union` newVolatiles
   | otherwise = Nothing
+
+reverseTrace :: Int -> Trace -> Trace
+reverseTrace r trace0 = reverse $ (IM.singleton 1 Halt):trace' where
+
+  trace' = evalState (mapM reverseTraceStep trace0) (initialState r)
+
+  reverseTraceStep :: Step -> State ExecState Step
+  reverseTraceStep step = do
+    state <- get
+    let state' = fromMaybe (error "reverseTrace: stepState returned Nothing") (stepState state step)
+    let step'  = IM.fromList $ concatMap (uncurry $ reverseCommand (state, state')) $ IM.toList step
+    put state'
+    return step'
+
+
+  reverseCommand :: (ExecState, ExecState) -> BotIdx -> Command -> [(BotIdx, Command)]
+  reverseCommand (s, s') idx = \case
+    Halt          -> []
+    Wait          -> pure $ (idx, Wait)
+    Flip          -> pure $ (idx, Flip)
+    (SMove d)     -> pure $ (idx, SMove (-d))
+    (LMove d1 d2) -> pure $ (idx, LMove (-d2) (-d1))
+
+    (Fission d m) -> let
+      idx' = IS.findMin $ botSeeds ((stateBots $ stateData s) IM.! idx)
+      in [(idx, FusionP d), (idx', FusionS (-d))]
+
+    (Fill d)      -> pure $ (idx, Void d)
+    (Void d)      -> pure $ (idx, Fill d)
+
+    (FusionP d)   -> let
+      bot  = (stateBots $ stateData s) IM.! idx
+      bot' = head . IM.elems . IM.filter ((== d + (botPos bot)) . botPos) $ (stateBots $ stateData s)
+      in pure (idx, Fission d (IS.size (botSeeds bot)))
+
+    (FusionS d)   -> []
+    (GFill d1 d2) -> pure $ (idx, GVoid d1 d2)
+    (GVoid d1 d2) -> pure $ (idx, GFill d1 d2)

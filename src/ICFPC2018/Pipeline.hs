@@ -1,10 +1,9 @@
 module ICFPC2018.Pipeline
   ( pipeline
   , moveToZero
-  , sliceModel
-  , bboxHeuristics
   ) where
 
+import Data.Maybe
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 import Linear.V3 (V3(..))
@@ -25,6 +24,9 @@ firstBot = 1
 
 secondBot :: BotIdx
 secondBot = 2
+
+packMove' :: Model -> I3 -> I3 -> [Command]
+packMove' model from to = map snd $ fromMaybe (error "unable move above a block") $ findPath model from to
 
 pipeline :: Model -> Trace
 pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [haltStep]
@@ -47,7 +49,7 @@ spawnBots :: Step
 spawnBots = IM.singleton firstBot $ Fission (V3 1 0 0) 0
 
 firstMove :: Step
-firstMove = IM.fromList [(firstBot, SMove (V3 0 1 0)), (secondBot, Flip)]
+firstMove = IM.fromList [(firstBot, LMove (V3 0 1 0) (V3 0 0 1)), (secondBot, Flip)]
 
 moveTrace :: ExecState -> Intensions -> (ExecState, Trace)
 moveTrace state intensions = helper state intensions []
@@ -70,11 +72,12 @@ moveBots state intensions = case getNextLine intensions of
   Nothing -> Nothing
   Just ((beginPos, endPos), xs) -> Just (IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)], xs)
     where
+      model = stateMatrix state
       bots = stateBots $ stateData state
       beginPos' = beginPos + (V3 0 1 0)
       endPos' = endPos + (V3 0 1 (-1))
-      firstCommands = packMove (botPos $ bots IM.! firstBot) beginPos'
-      secondCommands = packMove (botPos $ bots IM.! secondBot) endPos'
+      firstCommands = packMove' model (botPos $ bots IM.! firstBot) beginPos'
+      secondCommands = packMove' model (botPos $ bots IM.! secondBot) endPos'
 
 mergeCommands :: IntMap [Command] -> Trace
 mergeCommands commands = getZipList $ (\m v -> IM.insert secondBot v m) <$> (IM.singleton firstBot <$> firstCommands') <*> secondCommands'
@@ -97,32 +100,34 @@ fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondComman
     secondPos = botPos $ bots IM.! secondBot
     beginPos = firstPos - (V3 0 1 0)
     endPos = secondPos - (V3 0 1 (-1))
-    firstCommand | beginPos == endPos = Fill beginPos
-                 | otherwise = GFill beginPos endPos
+    firstCommand | beginPos == endPos = Fill $ beginPos - firstPos
+                 | otherwise = GFill (beginPos - firstPos) (endPos - beginPos)
     secondCommand | beginPos == endPos = Wait
-                  | otherwise = GFill endPos beginPos
+                  | otherwise = GFill (endPos - secondPos) (beginPos - endPos)
 
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
   where
+    model = stateMatrix state
     bots = stateBots $ stateData state
     firstPos = botPos $ bots IM.! firstBot
     secondPos = botPos $ bots IM.! secondBot
     firstCommands = [Flip]
     nextCoord = V3 0 0 (-1)
-    secondCommands = packMove secondPos $ firstPos + nextCoord
+    secondCommands = packMove' model secondPos $ firstPos + nextCoord
     prepareMoves = mergeCommands $ IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)]
     fusionStep = IM.fromList [(firstBot, FusionP nextCoord), (secondBot, FusionS (-nextCoord))]
 
 moveToZero :: ExecState -> Trace
 moveToZero state = IM.singleton firstBot <$> commands
   where
+    model = stateMatrix state
     bots = stateBots $ stateData state
     pos = botPos $ bots IM.! firstBot
-    commands = packMove pos 0
+    commands = packMove' model pos 0
 
 solve :: Model -> [I3] -> Intensions
-solve model idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
+solve model idxs = map FillIdx $ filter (\idx -> model T3.! idx) idxs
 
 getNextLine :: Intensions -> Maybe ((I3, I3), Intensions)
 getNextLine [] = Nothing
@@ -138,25 +143,3 @@ getNextLine ((FillIdx firstIdx):xs) = helper Any firstIdx xs
       | otherwise = Just ((firstIdx, lastIdx), intensions)
     helper _ lastIdx intensions = Just ((firstIdx, lastIdx), intensions)
 getNextLine _ = undefined
-
-sliceModel :: Model -> T3.Axis -> [Model]
-sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
-  where
-    axisSize T3.X = let (V3 xsz _ _) = T3.size model in xsz
-    axisSize T3.Y = let (V3 _ ysz _) = T3.size model in ysz
-    axisSize T3.Z = let (V3 _ _ zsz) = T3.size model in zsz
-    sz = axisSize axis
-    indices = [0, maxFD .. (sz - 2)] ++ [sz]
-    boundings = zip (init indices) (tail indices)
-
-bboxHeuristics :: Model -> Double
-bboxHeuristics model = sm / sz
-  where
-    bbox = T3.boundingBox model id
-    subModel = T3.slice model bbox
-    modelSum :: Int
-    modelSum = T3.nonzero subModel
-    sm :: Double
-    sm = fromIntegral $ modelSum
-    sz :: Double
-    sz = fromIntegral $ product $ T3.size subModel
