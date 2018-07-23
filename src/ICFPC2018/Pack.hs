@@ -41,6 +41,15 @@ linearDifferences maxLen = [ mkLinearDifference axis c
                            , c /= 0
                            ]
 
+allSingleCommands :: [Command]
+allSingleCommands = Wait : (map SMove longMoves)
+                    ++ (map (uncurry LMove) shortMoves)
+                    ++ (map Fill nearDiff)
+                    ++ (map Void nearDiff)
+
+fissionCommands :: Int -> [Command]
+fissionCommands numSeeds = map (uncurry Fission) [(dist, m) | dist <- nearDiff, m <- [0..numSeeds]]
+
 longMoves :: [LongDifference]
 longMoves = linearDifferences maxLLD
 
