@@ -2,6 +2,7 @@ module ICFPC2018.Pipeline
   ( pipeline
   , moveToZero
   , sliceModel
+  , splitModel
   , bboxHeuristics
   ) where
 
@@ -129,7 +130,7 @@ moveToZero state = IM.singleton firstBot <$> commands
     commands = packMove' model pos 0
 
 solve :: Model -> [I3] -> Intensions
-solve model idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs
+solve model idxs = map FillIdx $ filter (\idx -> model T3.! idx) idxs
 
 getNextLine :: Intensions -> Maybe ((I3, I3), Intensions)
 getNextLine [] = Nothing
@@ -157,6 +158,26 @@ sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end
     indices = [0, maxFD .. (sz - 2)] ++ [sz]
     boundings = zip (init indices) (tail indices)
 
+splitModel :: Model -> T3.Axis -> (Model, Model)
+splitModel model axis = (subModel (0, splitIdx - 1), subModel (splitIdx, sz))
+  where
+    (V3 xsz ysz zsz) = T3.size model
+    axisSize T3.X = xsz
+    axisSize T3.Y = ysz
+    axisSize T3.Z = zsz
+    sz = axisSize axis
+    step = 5
+    indices = [2, step .. (sz - 2)]
+    subModel (begin, end) = T3.sliceAxis model axis begin (end - 1)
+    heuristicsFirst = map (bboxHeuristics . subModel) $ map ((,) 0) indices
+    heuristicsSecond = map (bboxHeuristics . subModel) $ map (flip (,) sz) indices
+    heuristics = zipWith (\x y -> abs $ x - y) heuristicsFirst heuristicsSecond
+    argmax elems = snd $ foldr1 findMax $ zip elems [1..]
+      where
+        findMax f@(val, _) m@(maxVal, _) | maxVal < val = f
+                                                | otherwise = m
+    splitIdx = indices !! (argmax heuristics)
+
 bboxHeuristics :: Model -> Double
 bboxHeuristics model = sm / sz
   where
@@ -165,6 +186,6 @@ bboxHeuristics model = sm / sz
     modelSum :: Int
     modelSum = T3.nonzero subModel
     sm :: Double
-    sm = fromIntegral $ modelSum
+    sm = fromIntegral modelSum
     sz :: Double
     sz = fromIntegral $ product $ T3.size subModel
