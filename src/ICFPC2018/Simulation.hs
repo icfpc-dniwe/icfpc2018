@@ -48,6 +48,7 @@ data ExecStateData = ExecStateData { stateEnergy :: !Int
                                    , stateHarmonics :: !HarmonicState
                                    , stateBots :: !(IntMap BotState)
                                    , stateHalted :: !Bool
+                                   , stateCommands :: Trace
                                    }
                    deriving (Show, Eq, Generic)
 
@@ -91,6 +92,7 @@ initialState r = ExecState (ExecStateData { stateEnergy = 0
                                           , stateHarmonics = Low
                                           , stateBots = IM.singleton 1 initialBot
                                           , stateHalted = False
+                                          , stateCommands = []
                                           })
                            (T3.create (V.replicate (product size) False) size)
   where initialBot = BotState { botPos = 0
@@ -134,7 +136,7 @@ stepStateSM step = do
   let harmonicsCost = (if stateHarmonics == Low then 3 else 30) * product size
       botsCost = 20 * IM.size stateBots
       botPositions = M.fromList $ map (\(idx, bot) -> (botPos bot, idx)) $ IM.toList stateBots
-  modify $ \(state, _) -> (state { stateEnergy = stateEnergy + harmonicsCost + botsCost }, M.keysSet botPositions)
+  modify $ \(state, _) -> (state { stateEnergy = stateEnergy + harmonicsCost + botsCost, stateCommands = step : stateCommands }, M.keysSet botPositions)
   mapM_ (stepBot botPositions step) $ IM.toList step
   stepGroupBuilds step
   -- FIXME: check connectivity
