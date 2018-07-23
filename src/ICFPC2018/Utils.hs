@@ -87,3 +87,9 @@ splitPlanar (V3 0 y z) = Just (V3 0 y 0, V3 0 0 z)
 splitPlanar (V3 x 0 z) = Just (V3 x 0 0, V3 0 0 z)
 splitPlanar (V3 x y 0) = Just (V3 x 0 0, V3 0 y 0)
 splitPlanar _ = Nothing
+
+argmax :: Ord a => [a] -> Int
+argmax elems = snd $ foldl1 findMax $ zip elems [0..]
+  where
+    findMax m@(maxVal, _) f@(val, _) | maxVal < val = f
+                                     | otherwise = m

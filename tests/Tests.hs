@@ -38,7 +38,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , packTests
   , solverTests
   --, floodFillTests
-  , preparationTests
+  --, preparationTests
   ]
 
 --
@@ -358,7 +358,7 @@ simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests whe
 ---
 --- Preparation Tests
 ---
-
+{-
 splitTestModel :: Model
 splitTestModel = T3.fillBox emptyModel (V3 2 0 2, V3 11 15 11) True
 
@@ -373,7 +373,7 @@ preparationTests = testGroup "Preparation functions" [splitModelTests]
 
 splitModelTests :: TestTree
 splitModelTests = HU.testCase "splitting is correct" $ splitModel splitTestModel T3.X @?= (splitFirstModel, splitSecondModel)
-
+-}
 --
 -- A* tests
 --

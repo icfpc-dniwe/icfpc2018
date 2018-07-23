@@ -1,9 +1,8 @@
 module ICFPC2018.Prepare where
 
 import ICFPC2018.Types
+import ICFPC2018.Utils
 import qualified ICFPC2018.Tensor3 as T3
-
-import Debug.Trace
 
 sliceModel :: Model -> T3.Axis -> [Model]
 sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
@@ -13,31 +12,30 @@ sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end
     boundings = zip (init indices) (tail indices)
 
 splitModel :: Model -> T3.Axis -> (Model, Model)
-splitModel model axis
-  | trace ("splitModel: " ++ show model ++ " " ++ show axis ++ " I " ++ show splitIdx) False = undefined
-  | otherwise = (subModel (0, splitIdx - 1), subModel (splitIdx, sz))
+splitModel model axis = (subModel 0 (splitIdx - 1), subModel splitIdx sz)
   where
     sz = T3.axisSize model axis
     step = 5
     indices = [2, step .. (sz - 2)]
-    subModel (begin, end) = T3.sliceAxis model axis begin (end - 1)
-    heuristicsFirst = map (bboxHeuristics . subModel) $ map ((,) 0) indices
-    heuristicsSecond = map (bboxHeuristics . subModel) $ map (flip (,) sz) indices
-    heuristics = zipWith (\x y -> abs $ x - y) heuristicsFirst heuristicsSecond
-    argmax elems = snd $ foldr1 findMax $ zip elems [1..]
-      where
-        findMax f@(val, _) m@(maxVal, _) | maxVal < val = f
-                                                | otherwise = m
-    splitIdx = indices !! (argmax heuristics)
+    subModel begin end = T3.sliceAxis model axis begin (end - 1)
+
+    part :: Int -> Int -> Double
+    part begin end = fromIntegral (end - begin) / (fromIntegral sz)
+
+    heuristics (begin, end) = (part begin end) * (bboxHeuristics . subModel begin $ end)
+    heuristicsFirst = map heuristics $ map ((,) 0) indices
+    heuristicsSecond = map heuristics $ map (flip (,) sz) indices
+    combinedHeuristics = zipWith (\x y -> abs $ x - y) heuristicsFirst heuristicsSecond
+    splitIdx = indices !! (argmax combinedHeuristics)
 
 bboxHeuristics :: Model -> Double
 bboxHeuristics model = sm / sz
   where
     bbox = T3.boundingBox model id
     subModel = T3.slice model bbox
-    modelSum :: Int
-    modelSum = T3.nonzero subModel
+
     sm :: Double
-    sm = fromIntegral modelSum
+    sm = fromIntegral $ T3.nonzero subModel
+
     sz :: Double
     sz = fromIntegral $ product $ T3.size subModel

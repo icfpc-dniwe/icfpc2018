@@ -183,6 +183,23 @@ slice (View (T3View {..})) (closestNew, farthestNew)
       bbox = (closestIdx + closestNew, closestIdx + farthestNew)
 
 sliceAxis :: Unbox a => Tensor3 a -> Axis -> Int -> Int -> Tensor3 a
+sliceAxis tensor X begin end = slice tensor (xBegin, xEnd)
+  where
+    xBegin = V3 begin 0 0
+    (V3 _xsz ysz zsz) = size tensor
+    xEnd = V3 end ysz zsz
+sliceAxis tensor Y begin end = slice tensor (yBegin, yEnd)
+  where
+    yBegin = V3 0 begin 0
+    (V3 xsz _ysz zsz) = size tensor
+    yEnd = V3 xsz end zsz
+sliceAxis tensor Z begin end = slice tensor (zBegin, zEnd)
+  where
+    zBegin = V3 0 0 begin
+    (V3 xsz ysz _zsz) = size tensor
+    zEnd = V3 xsz ysz end
+{-
+sliceAxis :: Unbox a => Tensor3 a -> Axis -> Int -> Int -> Tensor3 a
 sliceAxis (Tensor tensor) axis = (View .) . (sliceAxisT tensor axis)
 sliceAxis (View t3View) axis = (View .) . (sliceAxisView t3View axis)
 
@@ -195,15 +212,16 @@ sliceAxisView :: Unbox a => T3View a -> Axis -> Int -> Int -> T3View a
 sliceAxisView (T3View {..}) X begin end = createView tensor (xBegin, xEnd)
   where
     xBegin = closestIdx + (V3 begin 0 0)
-    xEnd = closestIdx + min farthestIdx (V3 end 0 0)
+    xEnd = closestIdx + let (V3 _fx fy fz) = farthestIdx in (V3 end fy fz)
 sliceAxisView (T3View {..}) Y begin end = createView tensor (yBegin, yEnd)
   where
     yBegin = closestIdx + (V3 0 begin 0)
-    yEnd = closestIdx + min farthestIdx (V3 0 end 0)
+    yEnd = closestIdx + let (V3 fx _fy fz) = farthestIdx in (V3 fx end fz)
 sliceAxisView (T3View {..}) Z begin end = createView tensor (zBegin, zEnd)
   where
     zBegin = closestIdx + (V3 0 0 begin)
-    zEnd = closestIdx + min farthestIdx (V3 0 0 end)
+    zEnd = closestIdx + let (V3 fx fy _fz) = farthestIdx in (V3 fx fy end)
+-}
 
 nonzero :: Tensor3 Bool -> Int
 nonzero (Tensor (T3 v _)) = V.length $ V.filter id v
