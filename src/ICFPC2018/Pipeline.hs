@@ -5,6 +5,7 @@ module ICFPC2018.Pipeline
   , bboxHeuristics
   ) where
 
+import Data.Maybe
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 import Linear.V3 (V3(..))
@@ -25,6 +26,9 @@ firstBot = 1
 
 secondBot :: BotIdx
 secondBot = 2
+
+packMove' :: Model -> I3 -> I3 -> [Command]
+packMove' model from to = map snd $ fromMaybe (error "unable move above a block") $ findPath model from to
 
 pipeline :: Model -> Trace
 pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [haltStep]
@@ -70,11 +74,12 @@ moveBots state intensions = case getNextLine intensions of
   Nothing -> Nothing
   Just ((beginPos, endPos), xs) -> Just (IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)], xs)
     where
+      model = stateMatrix state
       bots = stateBots state
       beginPos' = beginPos + (V3 0 1 0)
       endPos' = endPos + (V3 0 1 (-1))
-      firstCommands = packMove (botPos $ bots IM.! firstBot) beginPos'
-      secondCommands = packMove (botPos $ bots IM.! secondBot) endPos'
+      firstCommands = packMove' model (botPos $ bots IM.! firstBot) beginPos'
+      secondCommands = packMove' model (botPos $ bots IM.! secondBot) endPos'
 
 mergeCommands :: IntMap [Command] -> Trace
 mergeCommands commands = getZipList $ (\m v -> IM.insert secondBot v m) <$> (IM.singleton firstBot <$> firstCommands') <*> secondCommands'
@@ -105,21 +110,23 @@ fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondComman
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
   where
+    model = stateMatrix state
     bots = stateBots state
     firstPos = botPos $ bots IM.! firstBot
     secondPos = botPos $ bots IM.! secondBot
     firstCommands = [Flip]
     nextCoord = V3 0 0 (-1)
-    secondCommands = packMove secondPos $ firstPos + nextCoord
+    secondCommands = packMove' model secondPos $ firstPos + nextCoord
     prepareMoves = mergeCommands $ IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)]
     fusionStep = IM.fromList [(firstBot, FusionP nextCoord), (secondBot, FusionS (-nextCoord))]
 
 moveToZero :: ExecState -> Trace
 moveToZero state = IM.singleton firstBot <$> commands
   where
+    model = stateMatrix state
     bots = stateBots state
     pos = botPos $ bots IM.! firstBot
-    commands = packMove pos 0
+    commands = packMove' model pos 0
 
 solve :: Model -> [I3] -> Intensions
 solve model idxs = map (\v -> FillIdx v) $ filter (\idx -> model T3.! idx) idxs

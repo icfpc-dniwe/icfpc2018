@@ -1,6 +1,7 @@
 module ICFPC2018.Pack
   ( packMove
   , packSingleBotIntensions
+  , findPath
   ) where
 
 import Data.Maybe
