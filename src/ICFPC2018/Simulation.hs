@@ -20,6 +20,8 @@ import Linear.V3 (V3(..))
 import Debug.Trace
 import GHC.Generics (Generic)
 import Control.DeepSeq
+import Control.Monad.State.Strict
+import Data.Maybe (fromMaybe)
 
 import ICFPC2018.Types
 import ICFPC2018.Utils
@@ -175,7 +177,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
         traceM ("commands   : " ++ show allCommands)
         traceM ("check      : " ++ show (map (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands))
         guard $ all (\(GFill nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
-        
+
         let srcCorners = map (\((GFill nd' _), pos) -> pos + nd') $ zip allCommands botPositions'
         let dstCorners = map (\((GFill nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions'
 
@@ -203,7 +205,7 @@ stepBot botPositions step (state@ExecState {..}, volatiles) (botIdx, command) =
         guard $ all (\(GVoid nd' fd') -> validNearDifference nd' && validFarDifference fd') allCommands
 
         let botPositions' = botPos <$> (stateBots IM.!) <$> allBots
-        
+
         let srcCorners = map (\((GVoid nd' _), pos) -> pos + nd') $ zip allCommands botPositions'
         let dstCorners = map (\((GVoid nd' fd'), pos) -> pos + nd' + fd') $ zip allCommands botPositions'
         guard $ all (\c -> T3.inBounds stateMatrix c) srcCorners
@@ -240,3 +242,43 @@ addVolatiles :: Set VolatileCoordinate -> Set VolatileCoordinate -> Maybe (Set V
 addVolatiles volatiles newVolatiles
   | S.null (volatiles `S.intersection` newVolatiles) = Just $ volatiles `S.union` newVolatiles
   | otherwise = Nothing
+
+
+
+reverseTrace :: Int -> Trace -> Trace
+reverseTrace r trace = reverse $ (IM.singleton 1 Halt):trace' where
+
+  trace' = evalState (mapM reverseTraceStep trace) (initialState r)
+
+  reverseTraceStep :: Step -> State ExecState Step
+  reverseTraceStep step = do
+    state <- get
+    let state' = fromMaybe (error "reverseTrace: stepState returned Nothing") (stepState state step)
+    let step'  = IM.fromList $ concatMap (uncurry $ reverseCommand (state, state')) $ IM.toList step
+    put state'
+    return step'
+
+
+  reverseCommand :: (ExecState, ExecState) -> BotIdx -> Command -> [(BotIdx, Command)]
+  reverseCommand (s, s') idx = \case
+    Halt          -> []
+    Wait          -> pure $ (idx, Wait)
+    Flip          -> pure $ (idx, Flip)
+    (SMove d)     -> pure $ (idx, SMove (-d))
+    (LMove d1 d2) -> pure $ (idx, LMove (-d2) (-d1))
+
+    (Fission d m) -> let
+      idx' = IS.findMin $ botSeeds ((stateBots s) IM.! idx)
+      in [(idx, FusionP d), (idx', FusionS (-d))]
+
+    (Fill d)      -> pure $ (idx, Void d)
+    (Void d)      -> pure $ (idx, Fill d)
+
+    (FusionP d)   -> let
+      bot  = (stateBots s) IM.! idx
+      bot' = head . IM.elems . IM.filter ((== d + (botPos bot)) . botPos) $ (stateBots s)
+      in pure (idx, Fission d (IS.size (botSeeds bot)))
+
+    (FusionS d)   -> []
+    (GFill d1 d2) -> pure $ (idx, GVoid d1 d2)
+    (GVoid d1 d2) -> pure $ (idx, GFill d1 d2)
