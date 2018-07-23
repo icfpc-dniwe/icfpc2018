@@ -70,7 +70,7 @@ moveBots state intensions = case getNextLine intensions of
   Nothing -> Nothing
   Just ((beginPos, endPos), xs) -> Just (IM.fromList [(firstBot, firstCommands), (secondBot, secondCommands)], xs)
     where
-      bots = stateBots state
+      bots = stateBots $ stateData state
       beginPos' = beginPos + (V3 0 1 0)
       endPos' = endPos + (V3 0 1 (-1))
       firstCommands = packMove (botPos $ bots IM.! firstBot) beginPos'
@@ -92,7 +92,7 @@ mergeCommands commands = getZipList $ (\m v -> IM.insert secondBot v m) <$> (IM.
 fillLine :: ExecState -> Step
 fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondCommand)]
   where
-    bots = stateBots state
+    bots = stateBots $ stateData state
     firstPos = botPos $ bots IM.! firstBot
     secondPos = botPos $ bots IM.! secondBot
     beginPos = firstPos - (V3 0 1 0)
@@ -105,7 +105,7 @@ fillLine state = IM.fromList [(firstBot, firstCommand), (secondBot, secondComman
 endStep :: ExecState -> Trace
 endStep state = prepareMoves ++ [fusionStep]
   where
-    bots = stateBots state
+    bots = stateBots $ stateData state
     firstPos = botPos $ bots IM.! firstBot
     secondPos = botPos $ bots IM.! secondBot
     firstCommands = [Flip]
@@ -117,7 +117,7 @@ endStep state = prepareMoves ++ [fusionStep]
 moveToZero :: ExecState -> Trace
 moveToZero state = IM.singleton firstBot <$> commands
   where
-    bots = stateBots state
+    bots = stateBots $ stateData state
     pos = botPos $ bots IM.! firstBot
     commands = packMove pos 0
 

@@ -111,7 +111,8 @@ packSingleBotIntensions model0 botIdx botPos0 xs = singleBotCommandsToTrace botI
         let lowerVoxel = V3 0 (-1) 0
             upIdx      = idx + (V3 0 1 0)
             path       = map snd $ fromMaybe (error "unable move above a block") $ findPath model botPos upIdx
-        -- We force the path to be computed before mutating the model
+        -- We force the path to be computed before mutating the model.
+        -- Path is already deeply evaluated in aStar.
         lift $ T3.write modelM (path `seq` idx) True
         put upIdx
         return (path ++ [Fill lowerVoxel])

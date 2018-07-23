@@ -42,10 +42,8 @@ library
                      , LambdaCase
                      , RecordWildCards
                      , ScopedTypeVariables
+                     , TupleSections
                      , DeriveGeneric
-                     , DeriveFunctor
-                     , DeriveFoldable
-                     , DeriveTraversable
   ghc-options:         -Wall -fprof-auto
 
 executable solver

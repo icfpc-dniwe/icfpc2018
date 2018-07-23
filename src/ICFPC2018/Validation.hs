@@ -8,8 +8,7 @@ module ICFPC2018.Validation
 
 import Linear.V3 (V3(..))
 
-import ICFPC2018.Tensor3 (I3)
-import qualified ICFPC2018.Tensor3 as T3
+import ICFPC2018.Tensor3 (I3, Tensor3Size)
 import ICFPC2018.Types
 import ICFPC2018.Utils
 
@@ -31,5 +30,5 @@ validNearDifference dist = mlen dist <= 2 && clen dist == 1
 validFarDifference :: FarDifference -> Bool
 validFarDifference dist = clen dist <= 30
 
-fillablePoint :: Model -> I3 -> Bool
-fillablePoint model = inBox (V3 1 0 1) (T3.size model - 2)
+fillablePoint :: Tensor3Size -> I3 -> Bool
+fillablePoint size = inBox (V3 1 0 1) (size - 2)

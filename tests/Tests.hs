@@ -291,15 +291,14 @@ genGFillStep R2B16F = genGFillStep R2B16P
 genGFillStep R1B7F  = genGFillStep R1B8P
 
 initialGFillState :: IntMap BotState -> ExecState
-initialGFillState bots = ExecState {
-    stateEnergy = 0
-  , stateHarmonics = High
-  , stateMatrix = emptyModel
-  , stateBots = bots
-  , stateGFillDone = False
-  , stateGVoidDone = False
-  , stateHalted = False
-  }
+initialGFillState bots =
+  ExecState { stateData = ExecStateData { stateEnergy = 0
+                                        , stateHarmonics = High
+                                        , stateBots = bots
+                                        , stateHalted = False
+                                        }
+            , stateMatrix = emptyModel
+            }
 
 simulationGFillTests :: TestTree
 simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests where
@@ -378,8 +377,8 @@ packMoveTest = QC.testProperty "packMoves is valid" $ within pathFindingTime $ f
           return (state, p)
 
 testSingleBotPackIntensions :: Intensions -> ExecState -> Bool
-testSingleBotPackIntensions intensions state =
-  isJust $ foldM stepState state $ packSingleBotIntensions (stateMatrix state) 1 (botPos $ stateBots state IM.! 1) intensions
+testSingleBotPackIntensions intensions state@(ExecState { stateData = ExecStateData {..}, .. }) =
+  isJust $ foldM stepState state $ packSingleBotIntensions stateMatrix 1 (botPos $ stateBots IM.! 1) intensions
 
 genFillablePoint :: ExecState -> Gen I3
 genFillablePoint state = do

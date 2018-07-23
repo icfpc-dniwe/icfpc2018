@@ -53,7 +53,7 @@ aStar getNeighbours metric start finish = go (PQ.singleton (metric start finish)
                             gScore' = M.insert neighbour tentativeScore gScore
         traverseBack cameFrom current path
           | current == start = path
-          | otherwise = traverseBack cameFrom prev (step : path)
+          | otherwise = traverseBack cameFrom prev (step `seq` (step : path))
           where step@(prev, _) = cameFrom M.! current
 
 {-

@@ -27,6 +27,7 @@ module ICFPC2018.Tensor3
   , unsafeThaw
   , read
   , write
+  , mSize
   ) where
 
 import Prelude hiding (read, replicate)
@@ -253,3 +254,6 @@ read (MT3 dat sz) idx = (lidx `seq`) <$> MV.unsafeRead dat lidx
 write :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> I3 -> a -> m ()
 write (MT3 dat sz) idx val = MV.unsafeWrite dat lidx (lidx `seq` val)
   where lidx = checkedLinearIdx sz idx
+
+mSize :: (Unbox a, PrimMonad m) => MTensor3 (PrimState m) a -> m Tensor3Size
+mSize (MT3 _ sz) = return sz

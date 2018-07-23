@@ -1,5 +1,6 @@
 module ICFPC2018.Utils where
 
+import Control.Applicative
 import Linear.V3 (V3(..))
 
 div1 :: Integral a => a -> a -> a
@@ -87,3 +88,6 @@ splitPlanar (V3 0 y z) = Just (V3 0 y 0, V3 0 0 z)
 splitPlanar (V3 x 0 z) = Just (V3 x 0 0, V3 0 0 z)
 splitPlanar (V3 x y 0) = Just (V3 x 0 0, V3 0 y 0)
 splitPlanar _ = Nothing
+
+maybeAlt :: Alternative f => Maybe a -> f a
+maybeAlt = maybe empty pure
