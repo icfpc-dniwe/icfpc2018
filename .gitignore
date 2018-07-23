@@ -1,4 +1,7 @@
 dist/
 examples/
 *.nbt
-
+.cabal-sandbox/
+.stack-work
+cabal.sandbox.config
+tasks
