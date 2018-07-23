@@ -25,6 +25,7 @@ import ICFPC2018.Pack
 import qualified ICFPC2018.Tensor3 as T3
 import ICFPC2018.Pipeline
 import qualified ICFPC2018.Solvers.HighSolver as High
+import ICFPC2018.Prepare
 
 main :: IO ()
 main = defaultMain tests
@@ -37,6 +38,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , packTests
   , solverTests
   --, floodFillTests
+  , preparationTests
   ]
 
 --
@@ -44,7 +46,14 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
 --
 
 tensor3Tests :: TestTree
-tensor3Tests = testGroup "Tensor3 tests" [tensor3Flip, tensor3InvalidIndex, tensor3InvalidUpdate]
+tensor3Tests = testGroup "Tensor3 tests" [ tensor3Flip
+                                         , tensor3InvalidIndex
+                                         , tensor3InvalidUpdate
+                                         , tensor3ViewSize
+                                         , tensor3ViewIndex
+                                         --, tensor3ViewUpdate
+                                         , tensor3Fill
+                                         , tensor3FillBox]
 
 instance (Unbox a, Arbitrary a) => Arbitrary (Tensor3 a) where
   arbitrary = do
@@ -71,6 +80,40 @@ tensor3InvalidIndex = QC.testProperty "Invalid Tensor3 index" $ \(tensor :: Tens
 
 tensor3InvalidUpdate :: TestTree
 tensor3InvalidUpdate = QC.testProperty "Invalid Tensor3 update" $ \(tensor :: Tensor3 ()) -> isBottom $ T3.update tensor [(T3.size tensor, ())]
+
+testViewTensor :: Tensor3 Bool
+testViewTensor = T3.replicate (V3 3 3 3) False `T3.update` [(V3 1 1 1, True)]
+
+testViewView :: Tensor3 Bool
+testViewView = testViewTensor `T3.slice` (V3 1 1 1, V3 2 2 2)
+
+tensor3ViewSize :: TestTree
+tensor3ViewSize = HU.testCase "Tensor3 view size" $ T3.size testViewView @?= (V3 2 2 2)
+
+tensor3ViewIndex :: TestTree
+tensor3ViewIndex = HU.testCase "Tensor3 view index" $ testViewView T3.! (V3 0 0 0) @?= True
+{-
+tensor3ViewUpdate :: TestTree
+tensor3ViewUpdate = HU.testCase "Tensor3 view update" $ testViewView `T3.update` [(V3 0 0 0, False)] @?= T3.slice (T3.replicate (V3 3 3 3) False) (V3 1 1 1, V3 2 2 2)
+-}
+testFillModelFalse :: Model
+testFillModelFalse = T3.replicate (V3 3 3 3) False
+
+testFillModelTrue :: Model
+testFillModelTrue = T3.replicate (V3 3 3 3) True
+
+testFillModelBox :: Model
+testFillModelBox = testFillModelFalse `T3.update` [ (V3 1 1 1, True), (V3 1 1 2, True)
+                                                  , (V3 1 2 1, True), (V3 1 2 2, True)
+                                                  , (V3 2 1 1, True), (V3 2 1 2, True)
+                                                  , (V3 2 2 1, True), (V3 2 2 2, True)
+                                                  ]
+
+tensor3Fill :: TestTree
+tensor3Fill = HU.testCase "Fill whole tensor" $ testFillModelFalse `T3.fill` True @?= testFillModelTrue
+
+tensor3FillBox :: TestTree
+tensor3FillBox = HU.testCase "Fill subtensor" $ T3.fillBox testFillModelFalse (V3 1 1 1, V3 2 2 2) True @?= testFillModelBox
 
 --
 -- Simulation tests
@@ -311,6 +354,25 @@ simulationGFillTests = testGroup "GFill edge cases" $ failTests ++ succTests whe
   succBots = map (\gen -> IM.fromList $ zip [1..] $ initialGFillBots gen) succCases
   failTests = map (\(bots, gen) -> failEmpty ("GFill: " ++ show gen) bots [IM.toList $ genGFillStep gen]) $ zip failBots failCases
   succTests = map (\(bots, gen) -> succEmpty ("GFill: " ++ show gen) bots [IM.toList $ genGFillStep gen]) $ zip succBots succCases
+
+---
+--- Preparation Tests
+---
+
+splitTestModel :: Model
+splitTestModel = T3.fillBox emptyModel (V3 2 0 2, V3 11 15 11) True
+
+splitFirstModel :: Model
+splitFirstModel = T3.sliceAxis splitTestModel T3.X 0 6
+
+splitSecondModel :: Model
+splitSecondModel = T3.sliceAxis splitTestModel T3.X 7 15
+
+preparationTests :: TestTree
+preparationTests = testGroup "Preparation functions" [splitModelTests]
+
+splitModelTests :: TestTree
+splitModelTests = HU.testCase "splitting is correct" $ splitModel splitTestModel T3.X @?= (splitFirstModel, splitSecondModel)
 
 --
 -- A* tests

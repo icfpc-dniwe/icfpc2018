@@ -3,6 +3,7 @@ module ICFPC2018.Validation
   , validShortDifference
   , validNearDifference
   , validFarDifference
+  , validFusion
   , fillablePoint
   ) where
 
@@ -36,9 +37,10 @@ fillablePoint model = inBox (V3 1 0 1) (T3.size model - 2)
 
 validFusion :: BotPos -> BotPos -> Bool
 validFusion masterPos slavePos = validNearDifference (masterPos - slavePos)
-
+{-
 possibleGFill :: [BotPos] -> Bool
 possibleGFill = undefined
 
 validGFill :: [(NearDifference, FarDifference)] -> Bool
 validGFill = undefined
+-}

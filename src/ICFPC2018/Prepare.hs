@@ -1,29 +1,23 @@
 module ICFPC2018.Prepare where
 
-import Linear.V3 (V3(..))
-
 import ICFPC2018.Types
 import qualified ICFPC2018.Tensor3 as T3
+
+import Debug.Trace
 
 sliceModel :: Model -> T3.Axis -> [Model]
 sliceModel model axis = map (\(begin, end) -> T3.sliceAxis model axis begin (end - 1)) boundings
   where
-    (V3 xsz ysz zsz) = T3.size model
-    axisSize T3.X = xsz
-    axisSize T3.Y = ysz
-    axisSize T3.Z = zsz
-    sz = axisSize axis
+    sz = T3.axisSize model axis
     indices = [0, maxFD .. (sz - 2)] ++ [sz]
     boundings = zip (init indices) (tail indices)
 
 splitModel :: Model -> T3.Axis -> (Model, Model)
-splitModel model axis = (subModel (0, splitIdx - 1), subModel (splitIdx, sz))
+splitModel model axis
+  | trace ("splitModel: " ++ show model ++ " " ++ show axis ++ " I " ++ show splitIdx) False = undefined
+  | otherwise = (subModel (0, splitIdx - 1), subModel (splitIdx, sz))
   where
-    (V3 xsz ysz zsz) = T3.size model
-    axisSize T3.X = xsz
-    axisSize T3.Y = ysz
-    axisSize T3.Z = zsz
-    sz = axisSize axis
+    sz = T3.axisSize model axis
     step = 5
     indices = [2, step .. (sz - 2)]
     subModel (begin, end) = T3.sliceAxis model axis begin (end - 1)

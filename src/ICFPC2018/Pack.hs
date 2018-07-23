@@ -41,7 +41,7 @@ linearDifferences maxLen = [ mkLinearDifference axis c
                            , c <- [-maxLen..maxLen]
                            , c /= 0
                            ]
-
+{-
 allSingleCommands :: [Command]
 allSingleCommands = Wait : (map SMove longMoves)
                     ++ (map (uncurry LMove) shortMoves)
@@ -50,10 +50,10 @@ allSingleCommands = Wait : (map SMove longMoves)
 
 fissionCommands :: Int -> [Command]
 fissionCommands numSeeds = map (uncurry Fission) [(dist, m) | dist <- nearDiff, m <- [0..numSeeds]]
-
+-}
 longMoves :: [LongDifference]
 longMoves = linearDifferences maxLLD
-
+{-
 nearDiff :: [NearDifference]
 nearDiff = [(V3 x y z)
             | x <- [-1..1]
@@ -61,7 +61,7 @@ nearDiff = [(V3 x y z)
             , z <- [-1..1]
             , validNearDifference (V3 x y z)
             ]
-
+-}
 shortMoves :: [(ShortDifference, ShortDifference)]
 shortMoves = [ (mkLinearDifference axis1 c1, mkLinearDifference axis2 c2)
              | axis1 <- [minBound..]

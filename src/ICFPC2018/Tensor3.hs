@@ -9,7 +9,10 @@ module ICFPC2018.Tensor3
   , (!)
   , copyView
   , size
+  , axisSize
   , update
+  , fill
+  , fillBox
   , create
   , replicate
   , boundingBox
@@ -61,7 +64,7 @@ data T3View a = T3View
                 , sizeView :: !Tensor3Size
                 } deriving (Show, Eq, Generic)
 
-data Tensor3 a = Tensor !(T3 a) | View !(T3View a) deriving (Show, Eq, Generic)
+data Tensor3 a = Tensor !(T3 a) | View !(T3View a) deriving (Show, Generic)
 
 data MTensor3 s a = MT3 !(MVector s a) !(Tensor3Size)
 
@@ -70,6 +73,11 @@ instance NFData a => NFData (T3 a)
 instance NFData a => NFData (T3View a)
 
 instance NFData a => NFData (Tensor3 a)
+
+instance (Unbox a, Eq a) => Eq (Tensor3 a) where
+  (Tensor t1) == (Tensor t2) = t1 == t2
+  t1 == t2 | size t1 == size t2 = foldr (\idx res -> res && (t1 ! idx == t2 ! idx)) False $ indexing (size t1)
+           | otherwise = False
 
 linearIdx :: Tensor3Size -> I3 -> Int
 linearIdx (V3 _ ySize zSize) (V3 xIdx yIdx zIdx) = zIdx + yIdx * zSize + xIdx * zSize * ySize
@@ -145,8 +153,8 @@ createView :: Unbox a => T3 a -> BoundingBox -> T3View a
 createView tensor@(T3 _ sz) (closestIdx, farthestIdx)
   | closestIdx >= (V3 0 0 0) &&
     closestIdx < farthestIdx &&
-    farthestIdx < sz = let sizeView = farthestIdx - closestIdx in T3View {..}
-  | otherwise = error "createView: invalid bounding box"
+    farthestIdx < sz = let sizeView = farthestIdx - closestIdx + (V3 1 1 1) in T3View {..}
+  | otherwise = error $ "createView: invalid bounding box" ++ " " ++ show closestIdx ++ ", " ++ show farthestIdx ++ " : " ++ show sz
 
 replicate :: Unbox a => Tensor3Size -> a -> Tensor3 a
 replicate sz v = Tensor $ replicateT sz v
@@ -170,7 +178,7 @@ slice (Tensor tensor) bbox = View $ createView tensor bbox
 slice (View (T3View {..})) (closestNew, farthestNew)
   | closestNew >= (V3 0 0 0) &&
     farthestNew < sizeView = View $ createView tensor bbox
-  | otherwise = error "changeView: invalid bounding box"
+  | otherwise = error "slice: invalid bounding box"
     where
       bbox = (closestIdx + closestNew, closestIdx + farthestNew)
 
@@ -200,6 +208,25 @@ sliceAxisView (T3View {..}) Z begin end = createView tensor (zBegin, zEnd)
 nonzero :: Tensor3 Bool -> Int
 nonzero (Tensor (T3 v _)) = V.length $ V.filter id v
 nonzero tensor = foldr (\idx acc -> if tensor ! idx then acc + 1 else acc) 0 $ indexing (size tensor)
+
+axisSize :: Tensor3 a -> Axis -> Int
+axisSize tensor axis = axSize axis
+  where
+    (V3 xsz ysz zsz) = size tensor
+    axSize X = xsz
+    axSize Y = ysz
+    axSize Z = zsz
+
+fill :: Unbox a => Tensor3 a -> a -> Tensor3 a
+fill tensor val = update tensor $ map (flip (,) val) $ indexing (size tensor)
+
+fillBox :: Unbox a => Tensor3 a -> BoundingBox -> a -> Tensor3 a
+fillBox t@(Tensor _) bbox val = Tensor $ tensor view
+  where
+    (View view) = slice t bbox `fill` val
+fillBox (View view) bbox val = View view {tensor = tensor view'}
+  where
+    (View view') = slice (View view) bbox `fill` val
 
 inBounds :: Tensor3 a -> I3 -> Bool
 inBounds tensor = inSizeBounds (size tensor)
