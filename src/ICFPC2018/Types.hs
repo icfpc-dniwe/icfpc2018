@@ -57,6 +57,18 @@ data Command
 
 instance NFData Command
 
+isFission :: Command -> Bool
+isFission (Fission _ _) = True
+isFission _             = False
+
+isFusionP :: Command -> Bool
+isFusionP (FusionP _) = True
+isFusionP _             = False
+
+isFusionS :: Command -> Bool
+isFusionS (FusionS _) = True
+isFusionS _             = False
+
 type Step = IntMap Command
 type Trace = [Step]
 type Score = Int

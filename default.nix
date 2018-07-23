@@ -1,6 +1,7 @@
 { mkDerivation, base, binary, bytestring, ChasingBottoms
-, containers, criterion, heredoc, linear, monad-loops, mtl, pqueue
-, stdenv, tasty, tasty-hunit, tasty-quickcheck, vector
+, containers, criterion, deepseq, heredoc, linear, monad-loops, mtl
+, pqueue, primitive, stdenv, tasty, tasty-hspec, tasty-hunit
+, tasty-quickcheck, transformers, vector
 }:
 mkDerivation {
   pname = "icfpc2018";
@@ -9,14 +10,16 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base binary bytestring containers linear monad-loops mtl pqueue
-    vector
+    base binary bytestring containers deepseq linear monad-loops mtl
+    pqueue primitive transformers vector
   ];
   executableHaskellDepends = [ base binary bytestring linear ];
   testHaskellDepends = [
-    base ChasingBottoms containers heredoc linear tasty tasty-hunit
-    tasty-quickcheck vector
+    base ChasingBottoms containers heredoc linear tasty tasty-hspec
+    tasty-hunit tasty-quickcheck vector
   ];
-  benchmarkHaskellDepends = [ base binary bytestring criterion ];
+  benchmarkHaskellDepends = [
+    base binary bytestring criterion linear
+  ];
   license = stdenv.lib.licenses.bsd3;
 }
