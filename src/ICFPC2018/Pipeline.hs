@@ -27,6 +27,7 @@ secondBot = 2
 
 packMove' :: Model -> I3 -> I3 -> [Command]
 packMove' model from to = map snd $ fromMaybe (error "unable move above a block") $ findPath model from to
+--packMove' _ from to = packMove from to
 
 pipeline :: Model -> Trace
 pipeline model = spawnBots : firstMove : moves ++ endStep' ++ moveToZero' ++ [haltStep]
