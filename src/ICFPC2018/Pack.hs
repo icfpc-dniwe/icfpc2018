@@ -44,6 +44,14 @@ linearDifferences maxLen = [ mkLinearDifference axis c
 longMoves :: [LongDifference]
 longMoves = linearDifferences maxLLD
 
+nearDiff :: [NearDifference]
+nearDiff = [(V3 x y z)
+            | x <- [-1..1]
+            , y <- [-1..1]
+            , z <- [-1..1]
+            , validNearDifference (V3 x y z)
+            ]
+
 shortMoves :: [(ShortDifference, ShortDifference)]
 shortMoves = [ (mkLinearDifference axis1 c1, mkLinearDifference axis2 c2)
              | axis1 <- [minBound..]
@@ -98,7 +106,7 @@ packSingleBotIntensions model0 botIdx botPos0 xs = singleBotCommandsToTrace botI
     (t, pos) <- flip runStateT botPos0 $ fmap concat $ mapM (packIntension modelM0) xs
     model <- T3.freeze modelM0
     return (t, model, pos)
-    
+
   t2 = (map snd $ fromMaybe (error "unable to return to zero") $ findPath model1 pos1 0) ++ [Halt]
 
   packIntension :: MModel s -> Intension -> StateT I3 (ST s) [Command]
