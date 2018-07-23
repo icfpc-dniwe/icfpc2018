@@ -13,6 +13,7 @@ module ICFPC2018.Simulation
   ) where
 
 import Data.Maybe
+import Control.Arrow (first, second)
 import Control.Monad
 import Control.Arrow
 import Data.IntMap.Strict (IntMap)
@@ -47,6 +48,7 @@ data ExecStateData = ExecStateData { stateEnergy :: !Int
                                    , stateHarmonics :: !HarmonicState
                                    , stateBots :: !(IntMap BotState)
                                    , stateHalted :: !Bool
+                                   , stateCommands :: Trace
                                    }
                    deriving (Show, Eq, Generic)
 
@@ -90,6 +92,7 @@ initialState r = ExecState (ExecStateData { stateEnergy = 0
                                           , stateHarmonics = Low
                                           , stateBots = IM.singleton 1 initialBot
                                           , stateHalted = False
+                                          , stateCommands = []
                                           })
                            (T3.create (V.replicate (product size) False) size)
   where initialBot = BotState { botPos = 0
@@ -133,7 +136,7 @@ stepStateSM step = do
   let harmonicsCost = (if stateHarmonics == Low then 3 else 30) * product size
       botsCost = 20 * IM.size stateBots
       botPositions = M.fromList $ map (\(idx, bot) -> (botPos bot, idx)) $ IM.toList stateBots
-  modify $ \(state, _) -> (state { stateEnergy = stateEnergy + harmonicsCost + botsCost }, M.keysSet botPositions)
+  modify $ \(state, _) -> (state { stateEnergy = stateEnergy + harmonicsCost + botsCost, stateCommands = step : stateCommands }, M.keysSet botPositions)
   mapM_ (stepBot botPositions step) $ IM.toList step
   stepGroupBuilds step
   -- FIXME: check connectivity
@@ -172,7 +175,7 @@ stepBot botPositions step (botIdx, command) = do
   (_, size) <- ask
   let botState = stateBots IM.! botIdx
       myPos = botPos botState
-  
+
   case command of
     Halt -> do
       guard $ IM.size stateBots == 1 && myPos == 0
@@ -254,40 +257,74 @@ addVolatiles volatiles newVolatiles
   | S.null (volatiles `S.intersection` newVolatiles) = Just $ volatiles `S.union` newVolatiles
   | otherwise = Nothing
 
+
 reverseTrace :: Int -> Trace -> Trace
-reverseTrace r trace0 = reverse $ (IM.singleton 1 Halt):trace' where
+reverseTrace r
+  = fixIndices
+  . first  fixTrace
+  . second fixState
+  . reverseTrace'
+  where
 
-  trace' = evalState (mapM reverseTraceStep trace0) (initialState r)
+  reverseTrace' :: Trace -> ([IntMap (Command, Maybe Int)], ExecState)
+  reverseTrace' tr = runState (mapM reverseTraceStep tr) (initialState r)
 
-  reverseTraceStep :: Step -> State ExecState Step
+  reverseTraceStep :: Step -> State ExecState (IntMap (Command, Maybe Int))
   reverseTraceStep step = do
     state <- get
-    let state' = fromMaybe (error "reverseTrace: stepState returned Nothing") (stepState state step)
+    let state' = fromMaybe (error "reverseTrace: stepState(1) returned Nothing") (debugState state step)
     let step'  = IM.fromList $ concatMap (uncurry $ reverseCommand (state, state')) $ IM.toList step
     put state'
     return step'
 
-
-  reverseCommand :: (ExecState, ExecState) -> BotIdx -> Command -> [(BotIdx, Command)]
+  reverseCommand :: (ExecState, ExecState) -> BotIdx -> Command -> [(BotIdx, (Command, Maybe Int))]
   reverseCommand (s, s') idx = \case
     Halt          -> []
-    Wait          -> pure $ (idx, Wait)
-    Flip          -> pure $ (idx, Flip)
-    (SMove d)     -> pure $ (idx, SMove (-d))
-    (LMove d1 d2) -> pure $ (idx, LMove (-d2) (-d1))
+    Wait          -> pure $ (idx, (Wait, Nothing))
+    Flip          -> pure $ (idx, (Flip, Nothing))
+    (SMove d)     -> pure $ (idx, (SMove (-d), Nothing))
+    (LMove d1 d2) -> pure $ (idx, (LMove (-d2) (-d1), Nothing))
 
     (Fission d m) -> let
-      idx' = IS.findMin $ botSeeds ((stateBots $ stateData s) IM.! idx)
-      in [(idx, FusionP d), (idx', FusionS (-d))]
+      idx' = IS.findMin $ botSeeds ((stateBots . stateData $ s) IM.! idx)
+      in [(idx, (FusionP d, Nothing)), (idx', (FusionS (-d), Nothing))]
 
-    (Fill d)      -> pure $ (idx, Void d)
-    (Void d)      -> pure $ (idx, Fill d)
+    (Fill d)      -> pure $ (idx, (Void d, Nothing))
+    (Void d)      -> pure $ (idx, (Fill d, Nothing))
 
     (FusionP d)   -> let
-      bot  = (stateBots $ stateData s) IM.! idx
-      bot' = head . IM.elems . IM.filter ((== d + (botPos bot)) . botPos) $ (stateBots $ stateData s)
-      in pure (idx, Fission d (IS.size (botSeeds bot)))
+      bot  = (stateBots . stateData $ s) IM.! idx
+      (idx', bot') = head . IM.toList . IM.filter ((== d + (botPos bot)) . botPos) $ (stateBots . stateData $ s)
+      in pure (idx, (Fission d (IS.size (botSeeds bot')), Just idx'))
 
     (FusionS d)   -> []
-    (GFill d1 d2) -> pure $ (idx, GVoid d1 d2)
-    (GVoid d1 d2) -> pure $ (idx, GFill d1 d2)
+    (GFill d1 d2) -> pure $ (idx, (GVoid d1 d2, Nothing))
+    (GVoid d1 d2) -> pure $ (idx, (GFill d1 d2, Nothing))
+
+  fixState :: ExecState -> ExecState
+  fixState s = (initialState r) {stateMatrix = stateMatrix s}
+
+  fixTrace :: [IntMap (Command, Maybe Int)] -> [IntMap (Command, Maybe Int)]
+  fixTrace = tail . reverse . ((IM.singleton 1 (Halt, Nothing) ):)
+
+  fixIndices :: ([IntMap (Command, Maybe Int)], ExecState) -> Trace
+  fixIndices (tr, s) = evalState (mapM fixIndicesStep tr) (s, IM.singleton 1 1)
+
+  fixIndicesStep :: IntMap (Command, Maybe Int) -> State (ExecState, IntMap Int) Step
+  fixIndicesStep step = do
+    (state, imap) <- get
+    let step'  = IM.fromList . map (second fst . first (imap IM.!)) . IM.toList $ step
+    let state' = fromMaybe (error "reverseTrace: stepState(2) returned Nothing") (stepState state step')
+    let imap'
+          = foldl (\imap'' (idx', jdx') -> IM.insert idx' jdx' imap'') imap
+          . map (\(idx, (Fission d _m, Just idx')) -> let
+                    jdx = imap IM.! idx
+                    bot = (stateBots . stateData $ state') IM.! jdx
+                    botPos' = (botPos bot) + d
+                    jdx'    = fst . head . filter ((== botPos') . botPos . snd) . IM.toList . stateBots . stateData $ state'
+                    in (idx', jdx'))
+          . (filter (isFission . fst . snd))
+          $ (IM.toList step)
+
+    put (state', imap')
+    return step'

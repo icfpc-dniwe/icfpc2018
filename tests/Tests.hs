@@ -12,6 +12,7 @@ import Linear.V3 (V3(..))
 import Test.Tasty
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit as HU
+import Test.Tasty.Hspec as HS
 import Test.ChasingBottoms
 -- import Data.List (dropWhileEnd)
 -- import Text.Heredoc
@@ -28,10 +29,12 @@ import qualified ICFPC2018.Solvers.HighSolver as High
 import ICFPC2018.Prepare
 
 main :: IO ()
-main = defaultMain tests
+main = do
+  reverseTraceTests <- mkReverseTraceTests
+  defaultMain $ tests [reverseTraceTests]
 
-tests :: TestTree
-tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ testGroup "Tests"
+tests :: [TestTree] -> TestTree
+tests extraTests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ testGroup "Tests" $
   [ tensor3Tests
   , simulationTests
   , aStarTests
@@ -39,7 +42,7 @@ tests = adjustOption (min 16 :: QC.QuickCheckMaxSize -> QC.QuickCheckMaxSize) $ 
   , solverTests
   --, floodFillTests
   --, preparationTests
-  ]
+  ] ++ extraTests
 
 --
 -- Tensor3 Tests
@@ -540,3 +543,42 @@ mkFloodFillTest name s fs s' = QC.testProperty name
   $ T3.scanY (cleanup s) where
   cleanup = dropWhileEnd (== '\n') . dropWhile (=='\n') . filter (/= ' ')
 -}
+
+
+mkReverseTraceTests :: IO TestTree
+mkReverseTraceTests = testSpec "reverseTrace" reverseTraceSpec
+
+reverseTraceSpec :: HS.Spec
+reverseTraceSpec = do
+  describe "simple cases" $ do
+    it "works for movements" $ reverseTrace 2 (IM.fromList <$> [
+        [(1, SMove (V3    1    0    0))]
+      , [(1, SMove (V3    0    1    0))]
+      , [(1, SMove (V3    0    0    1))]
+      , [(1, SMove (V3    0 (-1)    0))]
+      , [(1, SMove (V3 (-1)    0    0))]
+      , [(1, SMove (V3    0    0 (-1)))]
+      , [(1, Halt)]
+      ]) `shouldBe` (IM.fromList <$> [
+        [(1, SMove (V3    0    0    1))]
+      , [(1, SMove (V3    1    0    0))]
+      , [(1, SMove (V3    0    1    0))]
+      , [(1, SMove (V3    0    0 (-1)))]
+      , [(1, SMove (V3    0 (-1)    0))]
+      , [(1, SMove (V3 (-1)    0    0))]
+      , [(1, Halt)]
+      ])
+
+    it "works for single fission/fusion" $ reverseTrace 4 (IM.fromList <$> [
+        [(1, Fission (V3 0 0 1) 0)]
+      , [(1, SMove (V3 0 2 0)), (2, SMove (V3 0 2 0))]
+      , [(1, FusionP (V3 0 0 1)), (2, FusionS (V3 0 0 (-1)))]
+      , [(1, SMove (V3 0 (-2) 0))]
+      , [(1, Halt)]
+      ]) `shouldBe` (IM.fromList <$> [
+        [(1, SMove (V3 0 2 0))]
+      , [(1, Fission (V3 0 0 1) 0)]
+      , [(1, SMove (V3 0 (-2) 0)), (2, SMove (V3 0 (-2) 0))]
+      , [(1, FusionP (V3 0 0 1)), (2, FusionS (V3 0 0 (-1)))]
+      , [(1, Halt)]
+      ])
